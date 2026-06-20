@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { useSimStore } from "@/lib/simStore";
-import { crews } from "@/lib/mockData";
+import { useState, useEffect } from "react";
+import { useSimStore, simStore } from "@/lib/simStore";
 import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
@@ -16,12 +16,25 @@ export const Route = createFileRoute("/dispatch")({
 
 function DispatchPage() {
   const tickets = useSimStore((s) => s.tickets);
+  const crews = useSimStore((s) => s.crews);
   const [selectedId, setSelectedId] = useState<string>(tickets[0]?.id);
   const selected = tickets.find((t) => t.id === selectedId) ?? tickets[0];
+  const [selectedCrewName, setSelectedCrewName] = useState<string | null>(null);
+  const [resolvingIds, setResolvingIds] = useState<string[]>([]);
+
+  // Auto-select the next ticket if the selected one is resolved/removed
+  useEffect(() => {
+    const visible = tickets.filter((t) => t.status !== "resolved");
+    if (visible.length > 0 && !visible.some((t) => t.id === selectedId)) {
+      setSelectedId(visible[0].id);
+    }
+  }, [tickets, selectedId]);
 
   const open = tickets.filter((t) => t.status === "open").length;
   const active = tickets.filter((t) => t.status === "assigned" || t.status === "in_progress").length;
   const resolved = tickets.filter((t) => t.status === "resolved").length;
+
+  const visibleTickets = tickets.filter((t) => t.status !== "resolved" || resolvingIds.includes(t.id));
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
@@ -44,14 +57,26 @@ function DispatchPage() {
               <h2 className="text-[13px] font-semibold uppercase tracking-wider">Active Tickets</h2>
             </div>
             <div>
-              {tickets.map((t) => {
+              {visibleTickets.map((t) => {
                 const isSel = selected?.id === t.id;
+                const isResolving = resolvingIds.includes(t.id);
+                const isEscalated = t.status === "escalated";
                 return (
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`w-full text-left px-5 py-4 border-b border-border transition-colors ${
-                      isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                    className={`w-full text-left px-5 transition-all duration-500 ease-in-out transform origin-top overflow-hidden ${
+                      isResolving
+                        ? "max-h-0 opacity-0 scale-y-0 py-0 border-b-transparent pointer-events-none"
+                        : "max-h-[150px] opacity-100 scale-y-100 py-4 border-b border-border"
+                    } ${
+                      isEscalated
+                        ? isSel
+                          ? "bg-purple-950/40 border-l-4 border-l-purple-500"
+                          : "bg-purple-950/10 border-l-2 border-l-purple-700/50 hover:bg-purple-950/20"
+                        : isSel
+                        ? "bg-primary/10 border-l-2 border-l-primary"
+                        : "hover:bg-surface-2"
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -67,6 +92,7 @@ function DispatchPage() {
                       </div>
                       <div className="text-right">
                         <div className={`mono text-xl font-semibold ${
+                          isEscalated ? "text-purple-400 font-bold" :
                           t.riskIndex >= 70 ? "text-risk-critical" : t.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
                         }`}>{t.riskIndex}</div>
                         <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
@@ -83,6 +109,17 @@ function DispatchPage() {
         <div className="col-span-12 lg:col-span-7 space-y-6">
           {selected && (
             <>
+              {/* Diagnostic Info Banner */}
+              {selected.status === "escalated" && (
+                <div className="bg-purple-950/40 border border-purple-500/30 p-4 text-purple-200 text-[12px] flex items-start gap-3 rounded animate-pulse">
+                  <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold uppercase tracking-wider text-purple-300">Diagnostic Info: Ward Engineering Overload</div>
+                    <p className="mt-1 text-purple-300/80">Hydraulic surge detected in local downstream branch. Diverting emergency auxiliary flow sensors. Dispatch protocol upgraded to level 2 (Senior Engineer inspection required).</p>
+                  </div>
+                </div>
+              )}
+
               {/* Evidence vault */}
               <div className="bento" style={{ padding: 0 }}>
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -110,8 +147,8 @@ function DispatchPage() {
                       background: i % 2 ? "#a89656" : "#7a5a3a",
                     }} />
                   ))}
-                  <div className="absolute border-2" style={{ left: "22%", top: "50%", width: "35%", height: "35%", borderColor: "var(--color-risk-critical)" }}>
-                    <span className="absolute -top-5 left-0 text-[10px] mono px-1.5 bg-risk-critical text-white">plastic 0.94</span>
+                  <div className={`absolute border-2 ${selected.status === "escalated" ? "border-purple-500" : "border-risk-critical"}`} style={{ left: "22%", top: "50%", width: "35%", height: "35%" }}>
+                    <span className={`absolute -top-5 left-0 text-[10px] mono px-1.5 text-white ${selected.status === "escalated" ? "bg-purple-600" : "bg-risk-critical"}`}>plastic 0.94</span>
                   </div>
                   <div className="absolute top-3 left-3 px-2 py-1 bg-black/70 border border-border">
                     <span className="text-[10px] mono uppercase tracking-widest text-white">REC · CH-014</span>
@@ -128,41 +165,91 @@ function DispatchPage() {
                   <h3 className="text-[13px] font-semibold uppercase tracking-wider">Crew Assignment · Proximity Sort</h3>
                 </div>
                 <div>
-                  {crews.map((c) => (
-                    <div key={c.id} className="px-5 py-4 border-b border-border flex items-center justify-between hover:bg-surface-2">
-                      <div className="flex items-center gap-3">
-                        <span className={`h-2 w-2 ${c.available ? "bg-risk-ok pulse-dot" : "bg-muted-foreground"}`} />
-                        <div>
-                          <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
-                          <div className="text-[11px] text-muted-foreground mono mt-0.5">{c.members} safai karamcharis · {c.available ? "available" : "engaged"}</div>
+                  {crews.map((c) => {
+                    const isCrewSelected = selectedCrewName === c.name;
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => c.available && selected.status !== "resolved" && setSelectedCrewName(c.name)}
+                        className={`px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
+                          c.available && selected.status !== "resolved" ? "cursor-pointer" : ""
+                        } ${
+                          isCrewSelected
+                            ? "bg-primary/10 border-l-2 border-l-primary"
+                            : "hover:bg-surface-2"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`h-2 w-2 ${c.available ? "bg-risk-ok pulse-dot" : "bg-muted-foreground"}`} />
+                          <div>
+                            <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
+                            <div className="text-[11px] text-muted-foreground mono mt-0.5">{c.members} safai karamcharis · {c.available ? "available" : "engaged"}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="mono text-sm font-medium">{c.distanceKm} km</div>
+                            <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                          </div>
+                          <button
+                            disabled={!c.available || selected.status === "resolved"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              simStore.dispatchCrew(selected.drainId, c.name);
+                              toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
+                              setSelectedCrewName(null);
+                            }}
+                            className="px-3 h-9 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[11px] font-semibold uppercase tracking-widest transition-colors disabled:opacity-40"
+                          >
+                            Assign
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="mono text-sm font-medium">{c.distanceKm} km</div>
-                          <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
-                        </div>
-                        <button
-                          disabled={!c.available}
-                          className="px-3 h-9 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[11px] font-semibold uppercase tracking-widest transition-colors disabled:opacity-40"
-                        >
-                          Assign
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Action bar */}
               <div className="grid grid-cols-3 gap-3">
-                <button className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
+                <button
+                  disabled={selected.status === "assigned" || selected.status === "in_progress" || selected.status === "resolved"}
+                  onClick={() => {
+                    const availableCrews = crews.filter((c) => c.available);
+                    if (availableCrews.length > 0) {
+                      const defaultCrew = availableCrews[0];
+                      const crewToDispatch = selectedCrewName || (defaultCrew ? defaultCrew.name : "Crew Alpha");
+                      simStore.dispatchCrew(selected.drainId, crewToDispatch);
+                      toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
+                      setSelectedCrewName(null);
+                    }
+                  }}
+                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+                >
                   Dispatch Crew <ArrowUpRight className="h-4 w-4" />
                 </button>
-                <button className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground transition-colors">
-                  False Positive
+                <button
+                  disabled={selected.status === "resolved"}
+                  onClick={() => {
+                    setResolvingIds((prev) => [...prev, selected.id]);
+                    toast.success("Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.");
+                    setTimeout(() => {
+                      simStore.resolveTicket(selected.id);
+                      setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
+                    }, 500);
+                  }}
+                  className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground transition-colors disabled:opacity-40"
+                >
+                  False Positive / Resolve
                 </button>
-                <button className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors">
+                <button
+                  disabled={selected.status === "resolved" || selected.status === "escalated"}
+                  onClick={() => {
+                    simStore.escalateTicket(selected.id);
+                    toast.info("Ticket escalated to Ward Engineer.");
+                  }}
+                  className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors disabled:opacity-40"
+                >
                   Escalate · Sr. Engineer
                 </button>
               </div>
@@ -192,6 +279,7 @@ function StatusPill({ s }: { s: string }) {
     assigned: { c: "bg-risk-warning text-black", t: "ASSIGNED" },
     in_progress: { c: "bg-primary text-white", t: "IN FIELD" },
     resolved: { c: "bg-risk-ok text-black", t: "RESOLVED" },
+    escalated: { c: "bg-purple-600 text-white border border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)] animate-pulse", t: "ESCALATED TO WARD ENGINEER" },
   };
   const v = m[s] ?? m.open;
   return <span className={`text-[9px] mono uppercase tracking-widest px-1.5 py-0.5 ${v.c}`}>{v.t}</span>;

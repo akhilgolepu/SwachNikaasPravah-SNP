@@ -2,10 +2,12 @@ import { useSyncExternalStore } from "react";
 import {
   initialDrains,
   initialTickets,
+  crews as initialCrews,
   computeRI,
   riStatus,
   type Drain,
   type Ticket,
+  type Crew,
 } from "./mockData";
 
 export interface AlertEvent {
@@ -25,6 +27,7 @@ interface State {
   alerts: AlertEvent[];
   selectedDrainId: string | null;
   stormMode: boolean;
+  crews: Crew[];
 }
 
 let state: State = {
@@ -36,6 +39,7 @@ let state: State = {
   ],
   selectedDrainId: null,
   stormMode: false,
+  crews: initialCrews,
 };
 
 const listeners = new Set<() => void>();
@@ -52,30 +56,124 @@ export const simStore = {
   dismissAlert(id: string) {
     setState((s) => ({ ...s, alerts: s.alerts.filter((a) => a.id !== id) }));
   },
-  dispatchCrew(drainId: string, crew: string) {
+  dismissDrain(drainId: string) {
     const drain = state.drains.find((d) => d.id === drainId);
     if (!drain) return;
-    const ticket: Ticket = {
-      id: `TKT-${2419 + state.tickets.length}`,
-      drainId: drain.id,
-      drainName: drain.name,
-      ward: drain.ward,
-      riskIndex: drain.riskIndex,
-      createdAt: "just now",
-      status: "assigned",
-      crew,
-      etaMin: Math.round(8 + Math.random() * 20),
-      evidenceFrame: new Date().toISOString().replace("T", " ").slice(0, 19) + " IST",
-    };
     setState((s) => ({
       ...s,
-      tickets: [ticket, ...s.tickets],
-      drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dispatched" as const } : d)),
+      drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dismissed" as const } : d)),
+      selectedDrainId: s.selectedDrainId === drainId ? null : s.selectedDrainId,
       alerts: [
-        { id: `A-${Date.now()}`, drainId, drainName: drain.name, ward: drain.ward, ri: drain.riskIndex, at: Date.now(), kind: "dispatch" as const, message: `${crew} dispatched — ETA ${ticket.etaMin}m` },
+        {
+          id: `A-${Date.now()}`,
+          drainId,
+          drainName: drain.name,
+          ward: drain.ward,
+          ri: drain.riskIndex,
+          at: Date.now(),
+          kind: "blockage" as const,
+          message: `Drain ${drain.name} was dismissed by operator`,
+        },
         ...s.alerts,
       ],
     }));
+  },
+  dispatchCrew(drainId: string, crewName: string) {
+    const drain = state.drains.find((d) => d.id === drainId);
+    if (!drain) return;
+    
+    const existingTicketIndex = state.tickets.findIndex(
+      (t) => t.drainId === drainId && (t.status === "open" || t.status === "assigned")
+    );
+    
+    const etaMin = Math.round(8 + Math.random() * 20);
+
+    setState((s) => {
+      let nextTickets = [...s.tickets];
+      if (existingTicketIndex !== -1) {
+        nextTickets[existingTicketIndex] = {
+          ...nextTickets[existingTicketIndex],
+          status: "in_progress",
+          crew: crewName,
+          etaMin,
+        };
+      } else {
+        const ticket: Ticket = {
+          id: `TKT-${2419 + s.tickets.length}`,
+          drainId: drain.id,
+          drainName: drain.name,
+          ward: drain.ward,
+          riskIndex: drain.riskIndex,
+          createdAt: "just now",
+          status: "in_progress",
+          crew: crewName,
+          etaMin,
+          evidenceFrame: new Date().toISOString().replace("T", " ").slice(0, 19) + " IST",
+        };
+        nextTickets = [ticket, ...nextTickets];
+      }
+
+      return {
+        ...s,
+        tickets: nextTickets,
+        drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dispatched" as const } : d)),
+        crews: s.crews.map((c) => (c.name === crewName ? { ...c, available: false } : c)),
+        alerts: [
+          { id: `A-${Date.now()}`, drainId, drainName: drain.name, ward: drain.ward, ri: drain.riskIndex, at: Date.now(), kind: "dispatch" as const, message: `${crewName} dispatched — ETA ${etaMin}m` },
+          ...s.alerts,
+        ],
+      };
+    });
+  },
+  resolveTicket(ticketId: string) {
+    const ticket = state.tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "resolved" as const } : t)),
+      drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, status: "ok" as const, riskIndex: 15, blockagePct: 10 } : d)),
+      crews: ticket.crew ? s.crews.map((c) => (c.name === ticket.crew ? { ...c, available: true } : c)) : s.crews,
+      alerts: [
+        {
+          id: `A-${Date.now()}`,
+          drainId: ticket.drainId,
+          drainName: ticket.drainName,
+          ward: ticket.ward,
+          ri: 15,
+          at: Date.now(),
+          kind: "blockage" as const,
+          message: `Ticket ${ticketId} resolved — site cleared by ${ticket.crew || "field crew"}`,
+        },
+        ...s.alerts,
+      ],
+    }));
+  },
+  escalateTicket(ticketId: string) {
+    const ticket = state.tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+
+    setState((s) => {
+      const nextRI = Math.min(100, ticket.riskIndex + 15);
+      return {
+        ...s,
+        tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, riskIndex: nextRI } : t)),
+        drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, riskIndex: nextRI, status: "critical" as const } : d)),
+        alerts: [
+          {
+            id: `A-${Date.now()}`,
+            drainId: ticket.drainId,
+            drainName: ticket.drainName,
+            ward: ticket.ward,
+            ri: nextRI,
+            at: Date.now(),
+            kind: "weather" as const,
+            message: `CRITICAL ESCALATION for ticket ${ticketId} — Senior Engineer requested.`,
+          },
+          ...s.alerts,
+        ],
+      };
+    });
   },
   toggleStorm() {
     setState((s) => {
@@ -97,7 +195,7 @@ export const simStore = {
           ],
         };
       } else {
-        return { ...s, stormMode: false, drains: initialDrains };
+        return { ...s, stormMode: false, drains: initialDrains, crews: initialCrews, tickets: initialTickets };
       }
     });
   },
