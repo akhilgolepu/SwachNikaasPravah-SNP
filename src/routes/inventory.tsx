@@ -23,13 +23,15 @@ function InventoryPage() {
 
   const handleInspect = (drainId: string) => {
     simStore.navigateToMapWithDrain(drainId);
-    router.navigate({ to: "/map" });
+    router.navigate({ to: "/" });
   };
 
-  const wards = ["ALL", ...Array.from(new Set(drains.map((d) => d.ward)))];
+  // Exclude dismissed assets from the inventory table
+  const activeDrains = drains.filter((d) => d.status !== "dismissed");
+  const wards = ["ALL", ...Array.from(new Set(activeDrains.map((d) => d.ward)))];
 
   const filtered = useMemo(() => {
-    return drains.filter((d) => {
+    return activeDrains.filter((d) => {
       if (ward !== "ALL" && d.ward !== ward) return false;
       if (risk === "CRIT" && d.status !== "critical") return false;
       if (risk === "WARN" && d.status !== "warning") return false;
@@ -37,14 +39,14 @@ function InventoryPage() {
       if (type !== "ALL" && d.type !== type) return false;
       return true;
     }).sort((a, b) => b.rainfallForecastMm - a.rainfallForecastMm);
-  }, [drains, ward, risk, type]);
+  }, [activeDrains, ward, risk, type]);
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
       <header className="mb-6">
         <p className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Operations / Inventory</p>
         <h1 className="text-2xl font-semibold mt-2">Drain Inventory & Stream Matrix</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filtered.length} of {drains.length} assets · sorted by 6h rainfall forecast</p>
+        <p className="text-sm text-muted-foreground mt-1">{filtered.length} of {activeDrains.length} active assets · sorted by 6h rainfall forecast</p>
       </header>
 
       {/* Filter matrix */}

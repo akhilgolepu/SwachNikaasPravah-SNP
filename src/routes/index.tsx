@@ -16,15 +16,16 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   const drains = useSimStore((s) => s.drains);
-  const critical = drains.filter((d) => d.status === "critical").length;
-  const warning = drains.filter((d) => d.status === "warning").length;
-  const dispatched = drains.filter((d) => d.status === "dispatched").length;
+  const activeDrains = drains.filter((d) => d.status !== "dismissed");
+  const critical = activeDrains.filter((d) => d.status === "critical").length;
+  const warning = activeDrains.filter((d) => d.status === "warning").length;
+  const dispatched = activeDrains.filter((d) => d.status === "dispatched").length;
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
       {/* Top KPI bento */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border mb-6">
-        <KPI label="Monitored Drains" value={drains.length.toString()} sub="across 2 cities" />
+        <KPI label="Monitored Drains" value={activeDrains.length.toString()} sub="across 2 cities" />
         <KPI label="Critical Now" value={critical.toString()} sub="RI ≥ 70" accent="critical" />
         <KPI label="Warning" value={warning.toString()} sub="45 ≤ RI < 70" accent="warning" />
         <KPI label="Crews Dispatched" value={dispatched.toString()} sub="active tickets" accent="primary" />

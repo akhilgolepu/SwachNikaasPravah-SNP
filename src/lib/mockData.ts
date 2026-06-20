@@ -1,4 +1,4 @@
-export type RiskStatus = "critical" | "warning" | "ok" | "dispatched";
+export type RiskStatus = "critical" | "warning" | "ok" | "dispatched" | "dismissed";
 
 export interface Drain {
   id: string;

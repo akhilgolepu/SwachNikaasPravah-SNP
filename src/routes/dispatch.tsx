@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useSimStore, simStore } from "@/lib/simStore";
 import { crews } from "@/lib/mockData";
-import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
+import {
+  Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users, Info,
+} from "lucide-react";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
@@ -16,33 +18,55 @@ export const Route = createFileRoute("/dispatch")({
 
 function DispatchPage() {
   const tickets = useSimStore((s) => s.tickets);
+  const crewAvailability = useSimStore((s) => s.crewAvailability);
   const [selectedId, setSelectedId] = useState<string>(tickets[0]?.id);
   const selected = tickets.find((t) => t.id === selectedId) ?? tickets[0];
   const [selectedCrewId, setSelectedCrewId] = useState<string | null>(null);
+  // Track which ticket ids are currently animating out (false positive / escalate)
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
 
   const open = tickets.filter((t) => t.status === "open").length;
   const active = tickets.filter((t) => t.status === "assigned" || t.status === "in_progress").length;
   const resolved = tickets.filter((t) => t.status === "resolved").length;
 
+  // Check if any ticket is escalated for the diagnostic banner
+  const hasEscalated = tickets.some((t) => t.status === "escalated");
+
   const handleDispatchCrew = () => {
     if (!selected) return;
-    const crewToDispatch = selectedCrewId 
+    // If no crew explicitly selected, default to first available (closest proximity)
+    const crewToDispatch = selectedCrewId
       ? crews.find((c) => c.id === selectedCrewId)
-      : crews.find((c) => c.available);
+      : crews.find((c) => crewAvailability[c.id] !== false && c.available);
     if (!crewToDispatch) return;
     simStore.dispatchCrew(selected.drainId, crewToDispatch.name);
+    setSelectedCrewId(null);
   };
 
   const handleFalsePositive = () => {
     if (!selected) return;
-    simStore.markTicketFalsePositive(selected.id);
-    simStore.showToast("Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.");
+    const ticketId = selected.id;
+    // Animate out first, then mutate
+    setRemovingIds((prev) => new Set([...prev, ticketId]));
+    setTimeout(() => {
+      simStore.markTicketFalsePositive(ticketId);
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(ticketId);
+        return next;
+      });
+      // Auto-select next available ticket
+      const remaining = tickets.filter((t) => t.id !== ticketId);
+      if (remaining.length > 0) setSelectedId(remaining[0].id);
+    }, 350);
   };
 
   const handleEscalate = () => {
     if (!selected) return;
     simStore.escalateTicket(selected.id);
   };
+
+  const isActionDisabled = !selected || selected.status === "resolved" || selected.status === "escalated" || selected.status === "in_progress";
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
@@ -57,6 +81,19 @@ function DispatchPage() {
         <StatTile label="Resolved Today" value={resolved.toString()} icon={<CheckCircle2 className="h-4 w-4 text-risk-ok" />} />
       </section>
 
+      {/* Escalation diagnostic banner */}
+      {hasEscalated && (
+        <div className="mb-6 flex items-start gap-3 px-5 py-4 border border-purple-500/40 bg-purple-500/5">
+          <Info className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="text-[12px] font-semibold text-purple-300 uppercase tracking-wider">Escalation Active — Ward Engineer Notified</div>
+            <div className="text-[11px] text-purple-400/80 mono mt-1">
+              Diagnostic package transmitted · Awaiting senior engineer acknowledgement · SLA clock running
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="grid grid-cols-12 gap-6">
         {/* Tickets list */}
         <div className="col-span-12 lg:col-span-5">
@@ -67,12 +104,15 @@ function DispatchPage() {
             <div>
               {tickets.map((t) => {
                 const isSel = selected?.id === t.id;
+                const isRemoving = removingIds.has(t.id);
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setSelectedId(t.id)}
+                    onClick={() => !isRemoving && setSelectedId(t.id)}
                     className={`w-full text-left px-5 py-4 border-b border-border transition-colors ${
                       isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                    } ${t.status === "escalated" ? "border-l-2 border-l-purple-500" : ""} ${
+                      isRemoving ? "fade-out-down pointer-events-none" : ""
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -88,7 +128,11 @@ function DispatchPage() {
                       </div>
                       <div className="text-right">
                         <div className={`mono text-xl font-semibold ${
-                          t.riskIndex >= 70 ? "text-risk-critical" : t.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
+                          t.status === "escalated"
+                            ? "text-purple-400"
+                            : t.riskIndex >= 70 ? "text-risk-critical"
+                            : t.riskIndex >= 45 ? "text-risk-warning"
+                            : "text-risk-ok"
                         }`}>{t.riskIndex}</div>
                         <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
                       </div>
@@ -149,50 +193,60 @@ function DispatchPage() {
                   <h3 className="text-[13px] font-semibold uppercase tracking-wider">Crew Assignment · Proximity Sort</h3>
                 </div>
                 <div>
-                  {crews.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => setSelectedCrewId(c.id)}
-                      disabled={!c.available}
-                      className={`w-full px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
-                        selectedCrewId === c.id ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
-                      } ${!c.available ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`h-2 w-2 ${c.available ? "bg-risk-ok pulse-dot" : "bg-muted-foreground"}`} />
-                        <div className="text-left">
-                          <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
-                          <div className="text-[11px] text-muted-foreground mono mt-0.5">{c.members} safai karamcharis · {c.available ? "available" : "engaged"}</div>
+                  {crews.map((c) => {
+                    const isAvailable = crewAvailability[c.id] !== false && c.available;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => isAvailable && setSelectedCrewId(c.id)}
+                        disabled={!isAvailable}
+                        className={`w-full px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
+                          selectedCrewId === c.id ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                        } ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`h-2 w-2 transition-colors duration-500 ${
+                            isAvailable ? "bg-risk-ok pulse-dot" : "bg-[#F5A524]"
+                          }`} />
+                          <div className="text-left">
+                            <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
+                            <div className="text-[11px] text-muted-foreground mono mt-0.5">
+                              {c.members} safai karamcharis · {isAvailable ? "available" : "engaged"}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="mono text-sm font-medium">{c.distanceKm} km</div>
-                          <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="mono text-sm font-medium">{c.distanceKm} km</div>
+                            <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Action bar */}
               <div className="grid grid-cols-3 gap-3">
-                <button 
+                <button
                   onClick={handleDispatchCrew}
-                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors"
+                  disabled={isActionDisabled}
+                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Dispatch Crew <ArrowUpRight className="h-4 w-4" />
                 </button>
-                <button 
+                <button
                   onClick={handleFalsePositive}
-                  className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors"
+                  disabled={isActionDisabled}
+                  className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   False Positive
                 </button>
-                <button 
+                <button
                   onClick={handleEscalate}
-                  className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors"
+                  disabled={isActionDisabled}
+                  className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Escalate · Sr. Engineer
                 </button>
@@ -223,7 +277,7 @@ function StatusPill({ s }: { s: string }) {
     assigned: { c: "bg-risk-warning text-black", t: "ASSIGNED" },
     in_progress: { c: "bg-primary text-white", t: "IN FIELD" },
     resolved: { c: "bg-risk-ok text-black", t: "RESOLVED" },
-    escalated: { c: "bg-purple-500 text-white", t: "ESCALATED" },
+    escalated: { c: "bg-purple-500 text-white", t: "ESCALATED TO WARD ENGINEER" },
   };
   const v = m[s] ?? m.open;
   return <span className={`text-[9px] mono uppercase tracking-widest px-1.5 py-0.5 ${v.c}`}>{v.t}</span>;

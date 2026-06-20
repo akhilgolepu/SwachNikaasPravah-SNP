@@ -12,7 +12,10 @@ const statusStyle = (s: Drain["status"]) => {
 export function AlertFeed() {
   const drains = useSimStore((s) => s.drains);
   const selected = useSimStore((s) => s.selectedDrainId);
-  const sorted = [...drains].sort((a, b) => b.riskIndex - a.riskIndex);
+  // Hide dismissed assets from the alert feed
+  const sorted = [...drains]
+    .filter((d) => d.status !== "dismissed")
+    .sort((a, b) => b.riskIndex - a.riskIndex);
 
   return (
     <div className="flex flex-col h-full bg-card border border-border">

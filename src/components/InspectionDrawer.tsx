@@ -31,20 +31,46 @@ export function InspectionDrawer() {
   const selectedId = useSimStore((s) => s.selectedDrainId);
   const drain = useSimStore((s) => s.drains.find((d) => d.id === s.selectedDrainId) || null);
   const [dispatching, setDispatching] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  // Reset closing state whenever a new drain is selected
+  useEffect(() => {
+    if (selectedId) setClosing(false);
+  }, [selectedId]);
 
   if (!selectedId || !drain) return null;
 
-  const close = () => { simStore.selectDrain(null); setDispatching(false); };
+  const triggerClose = (action?: () => void) => {
+    setClosing(true);
+    setTimeout(() => {
+      action?.();
+      simStore.selectDrain(null);
+      setDispatching(false);
+      setClosing(false);
+    }, 260);
+  };
+
+  const close = () => triggerClose();
+
+  const handleDismiss = () => {
+    triggerClose(() => simStore.dismissDrain(drain.id));
+  };
+
   const handleDispatch = (crewName: string) => {
     simStore.dispatchCrew(drain.id, crewName);
     setDispatching(false);
-    setTimeout(close, 400);
+    triggerClose();
   };
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={close} />
-      <aside className="fixed right-0 top-16 bottom-0 w-full sm:w-[520px] bg-background border-l border-border z-40 slide-in-right overflow-y-auto">
+      <div
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-260 ${closing ? "opacity-0" : "opacity-100"}`}
+        onClick={close}
+      />
+      <aside
+        className={`fixed right-0 top-16 bottom-0 w-full sm:w-[520px] bg-background border-l border-border z-40 overflow-y-auto ${closing ? "slide-out-right" : "slide-in-right"}`}
+      >
         <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <div>
             <div className="flex items-center gap-2">
@@ -52,7 +78,9 @@ export function InspectionDrawer() {
               <span className={`text-[10px] mono uppercase tracking-widest px-1.5 py-0.5 ${
                 drain.status === "critical" ? "bg-risk-critical text-white" :
                 drain.status === "warning" ? "bg-risk-warning text-black" :
-                drain.status === "dispatched" ? "bg-primary text-white" : "bg-risk-ok text-black"
+                drain.status === "dispatched" ? "bg-primary text-white" :
+                drain.status === "dismissed" ? "bg-muted text-muted-foreground" :
+                "bg-risk-ok text-black"
               }`}>{drain.status}</span>
             </div>
             <h3 className="text-base font-semibold mt-1">{drain.name}</h3>
@@ -116,14 +144,15 @@ export function InspectionDrawer() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDispatching(true)}
-                disabled={drain.status === "dispatched"}
-                className="col-span-2 flex items-center justify-center gap-2 h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground transition-colors text-[12px] font-semibold uppercase tracking-widest disabled:opacity-40"
+                disabled={drain.status === "dispatched" || drain.status === "dismissed"}
+                className="col-span-2 flex items-center justify-center gap-2 h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground transition-colors text-[12px] font-semibold uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Send className="h-4 w-4" /> Quick Dispatch
               </button>
-              <button 
-                onClick={() => { simStore.dismissDrain(drain.id); }}
-                className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors"
+              <button
+                onClick={handleDismiss}
+                disabled={drain.status === "dismissed"}
+                className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Dismiss
               </button>
@@ -172,7 +201,6 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 function StreamPanel({ label, drain, mode, channel }: { label: string; drain: any; mode: "raw" | "yolo"; channel: number }) {
   const ts = useTickingTimestamp();
   const channelId = nvrChannelId(drain, channel);
-  // Procedural "video frame" — animated noise + structures + (yolo) bounding boxes
   return (
     <div className="relative aspect-video bg-black border border-border overflow-hidden">
       <div className="absolute inset-0" style={{
@@ -211,7 +239,7 @@ function StreamPanel({ label, drain, mode, channel }: { label: string; drain: an
         </>
       )}
 
-      {/* CCTV scanlines — faint horizontal lines across whole frame */}
+      {/* CCTV scanlines */}
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-40"
@@ -220,7 +248,7 @@ function StreamPanel({ label, drain, mode, channel }: { label: string; drain: an
             "repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
         }}
       />
-      {/* CCTV noise / grain */}
+      {/* CCTV noise */}
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none opacity-[0.12] mix-blend-screen"
