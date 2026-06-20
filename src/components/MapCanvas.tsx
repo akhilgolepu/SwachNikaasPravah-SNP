@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useSimStore, simStore } from "@/lib/simStore";
-import type { Drain } from "@/lib/mockData";
+import type { Drain } from "@/lib/types";
 
 const VIEW = { w: 1000, h: 600 };
 const BOUNDS = { minLat: 18.9, maxLat: 19.3, minLng: 72.7, maxLng: 78.6 };
@@ -121,7 +121,7 @@ export function MapCanvas() {
                 <>
                   <rect x={x - 12} y={y - 12} width="24" height="24" fill="none" stroke={color} strokeWidth="1" />
                   <text x={x + 16} y={y - 8} fill="#FFFFFF" fontSize="10" className="mono">{d.id}</text>
-                  <text x={x + 16} y={y + 6} fill="#8F8F8F" fontSize="9" className="mono">RI {d.riskIndex}</text>
+                  <text x={x + 16} y={y + 6} fill="#8F8F8F" fontSize="9" className="mono">RI {d.risk_index}</text>
                 </>
               )}
             </g>

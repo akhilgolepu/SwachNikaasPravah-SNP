@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { simStore, useSimStore } from "@/lib/simStore";
-import { X, Play, Maximize2, Send, AlertTriangle } from "lucide-react";
+import { getInferenceFrameURL, getRawFrameURL } from "@/lib/api";
+import { X, RefreshCw, Send, AlertTriangle } from "lucide-react";
 
 function useTickingTimestamp() {
   const [now, setNow] = useState(() => new Date());
@@ -16,7 +17,7 @@ function useTickingTimestamp() {
   return { date, time: `${hh}:${mm}:${ss}`, ms };
 }
 
-function nvrChannelId(drain: any, channel: number) {
+function nvrChannelId(drain: { ward: string; id: string }, channel: number) {
   const wardSlug = String(drain.ward || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "")
@@ -35,8 +36,8 @@ export function InspectionDrawer() {
   if (!selectedId || !drain) return null;
 
   const close = () => { simStore.selectDrain(null); setDispatching(false); };
-  const handleDispatch = (crewName: string) => {
-    simStore.dispatchCrew(drain.id, crewName);
+  const handleDispatch = async (crewName: string) => {
+    await simStore.dispatchCrew(drain.id, crewName);
     setDispatching(false);
     setTimeout(close, 400);
   };
@@ -63,7 +64,7 @@ export function InspectionDrawer() {
           </button>
         </div>
 
-        {/* Split viewport */}
+        {/* Split viewport — real backend frames */}
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-2 gap-3">
             <StreamPanel label="RAW RTSP" drain={drain} mode="raw" channel={1} />
@@ -76,18 +77,18 @@ export function InspectionDrawer() {
               Risk Index Fusion — RI = 0.5·A<sub>b</sub> + 0.3·R<sub>f</sub> + 0.2·V<sub>t</sub>
             </h4>
             <div className="grid grid-cols-3 gap-3">
-              <Stat label="A_b · Blockage" value={`${drain.blockagePct}%`} accent={drain.blockagePct >= 70} />
-              <Stat label="R_f · Rain 6h" value={`${drain.rainfallForecastMm} mm`} accent={drain.rainfallForecastMm >= 50} />
-              <Stat label="V_t · Topo" value={drain.topoRisk.toFixed(2)} accent={drain.topoRisk >= 0.7} />
+              <Stat label="A_b · Blockage" value={`${drain.blockage_pct}%`} accent={drain.blockage_pct >= 70} />
+              <Stat label="R_f · Rain 6h" value={`${drain.rainfall_forecast_mm} mm`} accent={drain.rainfall_forecast_mm >= 50} />
+              <Stat label="V_t · Topo" value={drain.topo_risk.toFixed(2)} accent={drain.topo_risk >= 0.7} />
             </div>
             <div className="mt-3 bento-lg flex items-center justify-between" style={{ padding: 20 }}>
               <div>
                 <div className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Computed Risk Index</div>
                 <div className={`mono text-4xl font-semibold mt-1 ${
-                  drain.riskIndex >= 70 ? "text-risk-critical" : drain.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
-                }`}>{drain.riskIndex}<span className="text-base text-muted-foreground">/100</span></div>
+                  drain.risk_index >= 70 ? "text-risk-critical" : drain.risk_index >= 45 ? "text-risk-warning" : "text-risk-ok"
+                }`}>{drain.risk_index}<span className="text-base text-muted-foreground">/100</span></div>
               </div>
-              {drain.riskIndex >= 70 && (
+              {drain.risk_index >= 70 && (
                 <div className="flex items-center gap-2 text-risk-critical">
                   <AlertTriangle className="h-4 w-4" />
                   <span className="text-[11px] mono uppercase tracking-widest">Critical Threshold</span>
@@ -143,8 +144,8 @@ export function InspectionDrawer() {
                       <div className="text-[10px] mono opacity-70">{c.members} members</div>
                     </div>
                     <div className="text-right">
-                      <div className="mono text-sm font-medium">{c.distanceKm} km</div>
-                      <div className="text-[10px] mono opacity-70">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                      <div className="mono text-sm font-medium">{c.distance_km} km</div>
+                      <div className="text-[10px] mono opacity-70">ETA ~{Math.round(c.distance_km * 4)}m</div>
                     </div>
                   </button>
                 ))}
@@ -166,49 +167,42 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-function StreamPanel({ label, drain, mode, channel }: { label: string; drain: any; mode: "raw" | "yolo"; channel: number }) {
+function StreamPanel({ label, drain, mode, channel }: { label: string; drain: { id: string; ward: string; blockage_pct: number }; mode: "raw" | "yolo"; channel: number }) {
   const ts = useTickingTimestamp();
   const channelId = nvrChannelId(drain, channel);
-  // Procedural "video frame" — animated noise + structures + (yolo) bounding boxes
+  const [frameKey, setFrameKey] = useState(0);
+
+  // Get frame URL from the backend inference API
+  const frameUrl = mode === "yolo"
+    ? getInferenceFrameURL(drain.id)
+    : getRawFrameURL(drain.id);
+
+  // Auto-refresh frame every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setFrameKey((k) => k + 1), 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="relative aspect-video bg-black border border-border overflow-hidden">
+      {/* Backend-served frame (real JPEG from YOLO inference) */}
+      <img
+        key={frameKey}
+        src={`${frameUrl}&k=${frameKey}`}
+        alt={`${label} — ${drain.id}`}
+        className="absolute inset-0 w-full h-full object-cover"
+        onError={(e) => {
+          // Fallback to CSS gradient if backend isn't running
+          (e.target as HTMLImageElement).style.display = "none";
+        }}
+      />
+
+      {/* Fallback background (shown if img fails to load) */}
       <div className="absolute inset-0" style={{
         background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)",
       }} />
-      {/* "water" */}
-      <div className="absolute left-0 right-0 bottom-0 h-1/3" style={{
-        background: "linear-gradient(180deg, rgba(20,40,80,0.6), rgba(10,20,40,0.95))",
-      }} />
-      {/* "drain grate" */}
-      <div className="absolute inset-x-6 bottom-6 h-10 border border-[#2a2a2a]" style={{
-        backgroundImage: "repeating-linear-gradient(90deg, #1a1a1a 0 8px, #0a0a0a 8px 12px)",
-      }} />
-      {/* debris dots */}
-      {Array.from({ length: Math.min(10, Math.round(drain.blockagePct / 10)) }).map((_, i) => (
-        <div key={i} className="absolute h-1.5 w-2" style={{
-          left: `${10 + (i * 9) % 80}%`,
-          bottom: `${20 + (i % 3) * 6}%`,
-          background: i % 2 ? "#9a8a4a" : "#7a5a3a",
-        }} />
-      ))}
 
-      {mode === "yolo" && (
-        <>
-          {/* bounding boxes */}
-          <div className="absolute border-2" style={{ left: "18%", top: "55%", width: "28%", height: "30%", borderColor: "var(--color-risk-critical)" }}>
-            <span className="absolute -top-5 left-0 text-[9px] mono px-1 bg-risk-critical text-white">plastic 0.94</span>
-          </div>
-          <div className="absolute border-2" style={{ left: "55%", top: "60%", width: "22%", height: "22%", borderColor: "var(--color-risk-warning)" }}>
-            <span className="absolute -top-5 left-0 text-[9px] mono px-1 bg-risk-warning text-black">silt 0.81</span>
-          </div>
-          {/* segmentation overlay */}
-          <div className="absolute inset-0" style={{
-            background: "radial-gradient(ellipse at 30% 75%, rgba(255,59,59,0.25), transparent 25%), radial-gradient(ellipse at 65% 75%, rgba(245,165,36,0.18), transparent 22%)",
-          }} />
-        </>
-      )}
-
-      {/* CCTV scanlines — faint horizontal lines across whole frame */}
+      {/* CCTV scanlines */}
       <div
         aria-hidden
         className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-40"
@@ -217,23 +211,7 @@ function StreamPanel({ label, drain, mode, channel }: { label: string; drain: an
             "repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
         }}
       />
-      {/* CCTV noise / grain */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-[0.12] mix-blend-screen"
-        style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>\")",
-          backgroundSize: "160px 160px",
-        }}
-      />
-      {/* vignette */}
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)" }}
-      />
-      {/* moving scan line */}
+      {/* Moving scan line */}
       <div className="absolute inset-x-0 h-px bg-primary/60 scan-line" />
 
       {/* HUD — top */}
@@ -256,10 +234,13 @@ function StreamPanel({ label, drain, mode, channel }: { label: string; drain: an
               <span className="text-white/60">.{ts.ms}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button className="h-5 w-5 grid place-items-center bg-black/70 border border-white/10"><Play className="h-2.5 w-2.5 text-white" /></button>
-            <button className="h-5 w-5 grid place-items-center bg-black/70 border border-white/10"><Maximize2 className="h-2.5 w-2.5 text-white" /></button>
-          </div>
+          <button
+            onClick={() => setFrameKey((k) => k + 1)}
+            className="h-5 w-5 grid place-items-center bg-black/70 border border-white/10 hover:bg-primary/30"
+            title="Refresh frame"
+          >
+            <RefreshCw className="h-2.5 w-2.5 text-white" />
+          </button>
         </div>
       </div>
 
