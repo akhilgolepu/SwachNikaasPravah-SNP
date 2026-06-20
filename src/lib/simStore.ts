@@ -25,6 +25,8 @@ interface State {
   alerts: AlertEvent[];
   selectedDrainId: string | null;
   stormMode: boolean;
+  selectedCrewId: string | null;
+  toastMessage: string | null;
 }
 
 let state: State = {
@@ -36,6 +38,8 @@ let state: State = {
   ],
   selectedDrainId: null,
   stormMode: false,
+  selectedCrewId: null,
+  toastMessage: null,
 };
 
 const listeners = new Set<() => void>();
@@ -49,8 +53,22 @@ export const simStore = {
   getState: () => state,
   subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); },
   selectDrain(id: string | null) { setState((s) => ({ ...s, selectedDrainId: id })); },
-  dismissAlert(id: string) {
-    setState((s) => ({ ...s, alerts: s.alerts.filter((a) => a.id !== id) }));
+  selectCrew(id: string | null) { setState((s) => ({ ...s, selectedCrewId: id })); },
+  showToast(message: string) { 
+    setState((s) => ({ ...s, toastMessage: message }));
+    setTimeout(() => setState((s) => ({ ...s, toastMessage: null })), 3000);
+  },
+  dismissDrain(drainId: string) {
+    setState((s) => {
+      const drain = s.drains.find((d) => d.id === drainId);
+      if (!drain) return s;
+      return {
+        ...s,
+        drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "ok" as const } : d)),
+        selectedDrainId: null,
+        alerts: s.alerts.filter((a) => a.drainId !== drainId),
+      };
+    });
   },
   dispatchCrew(drainId: string, crew: string) {
     const drain = state.drains.find((d) => d.id === drainId);
@@ -62,7 +80,7 @@ export const simStore = {
       ward: drain.ward,
       riskIndex: drain.riskIndex,
       createdAt: "just now",
-      status: "assigned",
+      status: "in_progress",
       crew,
       etaMin: Math.round(8 + Math.random() * 20),
       evidenceFrame: new Date().toISOString().replace("T", " ").slice(0, 19) + " IST",
@@ -71,11 +89,29 @@ export const simStore = {
       ...s,
       tickets: [ticket, ...s.tickets],
       drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dispatched" as const } : d)),
+      selectedCrewId: null,
       alerts: [
         { id: `A-${Date.now()}`, drainId, drainName: drain.name, ward: drain.ward, ri: drain.riskIndex, at: Date.now(), kind: "dispatch" as const, message: `${crew} dispatched — ETA ${ticket.etaMin}m` },
         ...s.alerts,
       ],
+      toastMessage: "Routing coordinates and threshold analytics successfully transmitted to Field Crew.",
     }));
+  },
+  markTicketFalsePositive(ticketId: string) {
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "resolved" as const } : t)),
+      toastMessage: "Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.",
+    }));
+  },
+  escalateTicket(ticketId: string) {
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "escalated" as any } : t)),
+    }));
+  },
+  navigateToMapWithDrain(drainId: string) {
+    setState((s) => ({ ...s, selectedDrainId: drainId }));
   },
   toggleStorm() {
     setState((s) => {

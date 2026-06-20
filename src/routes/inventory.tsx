@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useSimStore } from "@/lib/simStore";
+import { useRouter } from "@tanstack/react-router";
+import { useSimStore, simStore } from "@/lib/simStore";
 import { RefreshCw, Wrench } from "lucide-react";
 
 export const Route = createFileRoute("/inventory")({
@@ -15,9 +16,15 @@ export const Route = createFileRoute("/inventory")({
 
 function InventoryPage() {
   const drains = useSimStore((s) => s.drains);
+  const router = useRouter();
   const [ward, setWard] = useState("ALL");
   const [risk, setRisk] = useState("ALL");
   const [type, setType] = useState("ALL");
+
+  const handleInspect = (drainId: string) => {
+    simStore.navigateToMapWithDrain(drainId);
+    router.navigate({ to: "/map" });
+  };
 
   const wards = ["ALL", ...Array.from(new Set(drains.map((d) => d.ward)))];
 
@@ -92,7 +99,10 @@ function InventoryPage() {
                   </td>
                   <td className="px-4 py-3 text-right mono text-[12px] text-muted-foreground">{d.uptime}%</td>
                   <td className="px-4 py-3 text-right">
-                    <button className="inline-flex items-center gap-1 px-2 py-1 border border-border text-[10px] mono uppercase tracking-widest hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors">
+                    <button 
+                      onClick={() => handleInspect(d.id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 border border-border text-[10px] mono uppercase tracking-widest hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                    >
                       <Wrench className="h-3 w-3" /> Inspect
                     </button>
                   </td>

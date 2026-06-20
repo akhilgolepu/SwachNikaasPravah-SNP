@@ -25,7 +25,7 @@ export interface Ticket {
   ward: string;
   riskIndex: number;
   createdAt: string;
-  status: "open" | "assigned" | "in_progress" | "resolved";
+  status: "open" | "assigned" | "in_progress" | "resolved" | "escalated";
   crew?: string;
   etaMin?: number;
   evidenceFrame: string;

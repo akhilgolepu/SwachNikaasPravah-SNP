@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppNavbar } from "@/components/AppNavbar";
+import { Toast } from "@/components/Toast";
 import { startSimulator } from "@/lib/simStore";
 
 function NotFoundComponent() {
@@ -79,6 +80,7 @@ function RootComponent() {
       <div className="min-h-screen bg-background text-foreground">
         <AppNavbar />
         <Outlet />
+        <Toast />
       </div>
     </QueryClientProvider>
   );
