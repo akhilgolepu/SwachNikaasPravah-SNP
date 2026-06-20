@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { simStore, useSimStore } from "@/lib/simStore";
-import { crews } from "@/lib/mockData";
 import { X, Play, Maximize2, Send, AlertTriangle } from "lucide-react";
 
 function useTickingTimestamp() {
@@ -30,6 +29,7 @@ function nvrChannelId(drain: any, channel: number) {
 export function InspectionDrawer() {
   const selectedId = useSimStore((s) => s.selectedDrainId);
   const drain = useSimStore((s) => s.drains.find((d) => d.id === s.selectedDrainId) || null);
+  const crews = useSimStore((s) => s.crews);
   const [dispatching, setDispatching] = useState(false);
 
   if (!selectedId || !drain) return null;
@@ -121,7 +121,7 @@ export function InspectionDrawer() {
               >
                 <Send className="h-4 w-4" /> Quick Dispatch
               </button>
-              <button className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground transition-colors">
+              <button onClick={() => simStore.dismissDrain(drain.id)} className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground transition-colors">
                 Dismiss
               </button>
             </div>

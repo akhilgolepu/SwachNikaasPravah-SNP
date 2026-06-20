@@ -6,6 +6,7 @@ const statusStyle = (s: Drain["status"]) => {
   if (s === "critical") return { dot: "bg-risk-critical pulse-dot", label: "CRITICAL", text: "text-risk-critical", border: "border-risk-critical" };
   if (s === "warning") return { dot: "bg-risk-warning", label: "WARNING", text: "text-risk-warning", border: "border-risk-warning" };
   if (s === "dispatched") return { dot: "bg-primary", label: "DISPATCHED", text: "text-primary", border: "border-primary" };
+  if (s === "dismissed") return { dot: "bg-muted-foreground/40", label: "DISMISSED", text: "text-muted-foreground", border: "border-border" };
   return { dot: "bg-risk-ok", label: "NORMAL", text: "text-risk-ok", border: "border-risk-ok" };
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSimStore, simStore } from "@/lib/simStore";
 import type { Drain } from "@/lib/mockData";
 
@@ -20,18 +20,69 @@ function project(d: Drain) {
 const statusColor = (s: Drain["status"]) =>
   s === "critical" ? "var(--color-risk-critical)" :
   s === "warning" ? "var(--color-risk-warning)" :
-  s === "dispatched" ? "var(--color-primary)" : "var(--color-risk-ok)";
+  s === "dispatched" ? "var(--color-primary)" :
+  s === "dismissed" ? "rgba(100, 110, 130, 0.4)" : "var(--color-risk-ok)";
 
 export function MapCanvas() {
   const drains = useSimStore((s) => s.drains);
   const selected = useSimStore((s) => s.selectedDrainId);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [viewBox, setViewBox] = useState(`0 0 ${VIEW.w} ${VIEW.h}`);
+  const currentViewBoxRef = useRef({ x: 0, y: 0, w: VIEW.w, h: VIEW.h });
 
   // tick to animate pulse
   useEffect(() => {
     const i = setInterval(() => svgRef.current?.classList.toggle("opacity-100"), 1000);
     return () => clearInterval(i);
   }, []);
+
+  // Cinematic pan-and-zoom (fly-to tracking) animated SVG viewBox
+  useEffect(() => {
+    const selectedDrain = drains.find((d) => d.id === selected);
+    let target = { x: 0, y: 0, w: VIEW.w, h: VIEW.h };
+
+    if (selectedDrain) {
+      const { x, y } = project(selectedDrain);
+      // Zoom in to a smaller window centered at target (x, y)
+      const zoomW = 350;
+      const zoomH = 210;
+      const zoomX = Math.max(0, Math.min(VIEW.w - zoomW, x - zoomW / 2));
+      const zoomY = Math.max(0, Math.min(VIEW.h - zoomH, y - zoomH / 2));
+      target = { x: zoomX, y: zoomY, w: zoomW, h: zoomH };
+    }
+
+    let start: number | null = null;
+    const duration = 1000; // 1 second smooth fly-to transition
+    const initial = { ...currentViewBoxRef.current };
+
+    let animId: number;
+    const step = (timestamp: number) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      
+      // Easing: cubic easeInOut
+      const ease = progress < 0.5 
+        ? 4 * progress * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      const current = {
+        x: initial.x + (target.x - initial.x) * ease,
+        y: initial.y + (target.y - initial.y) * ease,
+        w: initial.w + (target.w - initial.w) * ease,
+        h: initial.h + (target.h - initial.h) * ease,
+      };
+
+      currentViewBoxRef.current = current;
+      setViewBox(`${current.x.toFixed(1)} ${current.y.toFixed(1)} ${current.w.toFixed(1)} ${current.h.toFixed(1)}`);
+
+      if (progress < 1) {
+        animId = requestAnimationFrame(step);
+      }
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [selected, drains]);
 
   return (
     <div className="relative w-full h-full bg-[#0A0A0A] overflow-hidden border border-border">
@@ -41,7 +92,7 @@ export function MapCanvas() {
         background: "radial-gradient(circle at 30% 40%, rgba(0,102,255,0.06), transparent 50%), radial-gradient(circle at 75% 60%, rgba(23,201,100,0.04), transparent 50%)",
       }} />
 
-      <svg ref={svgRef} viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} className="absolute inset-0 w-full h-full">
+      <svg ref={svgRef} viewBox={viewBox} className="absolute inset-0 w-full h-full transition-all duration-300">
         {/* coastline / road squiggles */}
         <g stroke="#1F1F1F" strokeWidth="1" fill="none">
           <path d="M0,380 Q120,360 240,400 T480,380 T720,420 T1000,400" />
