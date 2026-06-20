@@ -109,11 +109,9 @@ function DispatchPage() {
                   <button
                     key={t.id}
                     onClick={() => !isRemoving && setSelectedId(t.id)}
-                    className={`w-full text-left px-5 py-4 border-b border-border transition-colors ${
-                      isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
-                    } ${t.status === "escalated" ? "border-l-2 border-l-purple-500" : ""} ${
-                      isRemoving ? "fade-out-down pointer-events-none" : ""
-                    }`}
+                    className={`w-full text-left px-5 py-4 border-b border-border transition-colors ${isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                      } ${t.status === "escalated" ? "border-l-2 border-l-purple-500" : ""} ${isRemoving ? "fade-out-down pointer-events-none" : ""
+                      }`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -127,13 +125,12 @@ function DispatchPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`mono text-xl font-semibold ${
-                          t.status === "escalated"
+                        <div className={`mono text-xl font-semibold ${t.status === "escalated"
                             ? "text-purple-400"
                             : t.riskIndex >= 70 ? "text-risk-critical"
-                            : t.riskIndex >= 45 ? "text-risk-warning"
-                            : "text-risk-ok"
-                        }`}>{t.riskIndex}</div>
+                              : t.riskIndex >= 45 ? "text-risk-warning"
+                                : "text-risk-ok"
+                          }`}>{t.riskIndex}</div>
                         <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
                       </div>
                     </div>
@@ -200,14 +197,12 @@ function DispatchPage() {
                         key={c.id}
                         onClick={() => isAvailable && setSelectedCrewId(c.id)}
                         disabled={!isAvailable}
-                        className={`w-full px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
-                          selectedCrewId === c.id ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
-                        } ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
+                        className={`w-full px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${selectedCrewId === c.id ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                          } ${!isAvailable ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`h-2 w-2 transition-colors duration-500 ${
-                            isAvailable ? "bg-risk-ok pulse-dot" : "bg-[#F5A524]"
-                          }`} />
+                          <span className={`h-2 w-2 transition-colors duration-500 ${isAvailable ? "bg-risk-ok pulse-dot" : "bg-[#F5A524]"
+                            }`} />
                           <div className="text-left">
                             <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
                             <div className="text-[11px] text-muted-foreground mono mt-0.5">
