@@ -1,47 +1,46 @@
+/**
+ * simStore — Application state store backed by the FastAPI backend.
+ *
+ * Uses React 19's useSyncExternalStore for zero-dependency reactivity.
+ * All mutations go through the backend REST API and the store updates
+ * optimistically. WebSocket messages drive real-time state changes.
+ */
 import { useSyncExternalStore } from "react";
+import type { Drain, Ticket, Crew, AlertEvent, WebSocketMessage } from "./types";
 import {
-  initialDrains,
-  initialTickets,
-  crews as initialCrews,
-  computeRI,
-  riStatus,
-  type Drain,
-  type Ticket,
-  type Crew,
-} from "./mockData";
+  fetchDrains, fetchTickets, fetchCrews, fetchAlerts,
+  dispatchCrewAPI, resolveTicketAPI, escalateTicketAPI,
+  dismissDrainAPI, toggleStormAPI,
+} from "./api";
+import {
+  connectWebSocket, onWebSocketMessage,
+  getWsStatus, subscribeWsStatus,
+} from "./websocket";
 
-export interface AlertEvent {
-  id: string;
-  drainId: string;
-  drainName: string;
-  ward: string;
-  ri: number;
-  at: number;
-  kind: "blockage" | "weather" | "dispatch";
-  message: string;
-}
-
-interface State {
+// ── State Shape ─────────────────────────────────────────────────────────────
+export interface State {
   drains: Drain[];
   tickets: Ticket[];
   alerts: AlertEvent[];
+  crews: Crew[];
   selectedDrainId: string | null;
   stormMode: boolean;
-  crews: Crew[];
+  wsStatus: "connecting" | "connected" | "disconnected";
+  loading: boolean;
 }
 
 let state: State = {
-  drains: initialDrains,
-  tickets: initialTickets,
-  alerts: [
-    { id: "A-init-1", drainId: "HYD-MDP-003", drainName: "Madhapur HITEC Underpass", ward: "Madhapur", ri: 86, at: Date.now() - 240000, kind: "blockage", message: "Critical blockage detected — plastic + silt" },
-    { id: "A-init-2", drainId: "MUM-WOR-018", drainName: "Worli Sea Face Box", ward: "Worli", ri: 83, at: Date.now() - 660000, kind: "weather", message: "68mm/6h forecast — high cascade risk" },
-  ],
+  drains: [],
+  tickets: [],
+  alerts: [],
+  crews: [],
   selectedDrainId: null,
   stormMode: false,
-  crews: initialCrews,
+  wsStatus: "disconnected",
+  loading: true,
 };
 
+// ── Pub/Sub ─────────────────────────────────────────────────────────────────
 const listeners = new Set<() => void>();
 function emit() { listeners.forEach((l) => l()); }
 function setState(updater: (s: State) => State) {
@@ -49,181 +48,242 @@ function setState(updater: (s: State) => State) {
   emit();
 }
 
-export const simStore = {
-  getState: () => state,
-  subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); },
-  selectDrain(id: string | null) { setState((s) => ({ ...s, selectedDrainId: id })); },
-  dismissAlert(id: string) {
-    setState((s) => ({ ...s, alerts: s.alerts.filter((a) => a.id !== id) }));
-  },
-  dismissDrain(drainId: string) {
-    const drain = state.drains.find((d) => d.id === drainId);
-    if (!drain) return;
-    setState((s) => ({
-      ...s,
-      drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dismissed" as const } : d)),
-      selectedDrainId: s.selectedDrainId === drainId ? null : s.selectedDrainId,
-      alerts: [
-        {
-          id: `A-${Date.now()}`,
-          drainId,
-          drainName: drain.name,
-          ward: drain.ward,
-          ri: drain.riskIndex,
-          at: Date.now(),
-          kind: "blockage" as const,
-          message: `Drain ${drain.name} was dismissed by operator`,
-        },
-        ...s.alerts,
-      ],
-    }));
-  },
-  dispatchCrew(drainId: string, crewName: string) {
-    const drain = state.drains.find((d) => d.id === drainId);
-    if (!drain) return;
-    
-    const existingTicketIndex = state.tickets.findIndex(
-      (t) => t.drainId === drainId && (t.status === "open" || t.status === "assigned")
-    );
-    
-    const etaMin = Math.round(8 + Math.random() * 20);
-
-    setState((s) => {
-      let nextTickets = [...s.tickets];
-      if (existingTicketIndex !== -1) {
-        nextTickets[existingTicketIndex] = {
-          ...nextTickets[existingTicketIndex],
-          status: "in_progress",
-          crew: crewName,
-          etaMin,
-        };
-      } else {
-        const ticket: Ticket = {
-          id: `TKT-${2419 + s.tickets.length}`,
-          drainId: drain.id,
-          drainName: drain.name,
-          ward: drain.ward,
-          riskIndex: drain.riskIndex,
-          createdAt: "just now",
-          status: "in_progress",
-          crew: crewName,
-          etaMin,
-          evidenceFrame: new Date().toISOString().replace("T", " ").slice(0, 19) + " IST",
-        };
-        nextTickets = [ticket, ...nextTickets];
+// ── WebSocket Integration ───────────────────────────────────────────────────
+function handleWsMessage(msg: WebSocketMessage) {
+  switch (msg.event) {
+    case "BLOCKAGE_ALERT":
+    case "DRAIN_UPDATE":
+      // Update the specific drain in state
+      if (msg.drain_id && msg.drain_id !== "SYS") {
+        setState((s) => ({
+          ...s,
+          drains: s.drains.map((d) =>
+            d.id === msg.drain_id
+              ? {
+                  ...d,
+                  blockage_pct: msg.blockage_pct ?? d.blockage_pct,
+                  risk_index: msg.risk_index ?? d.risk_index,
+                  status: (msg.status as Drain["status"]) ?? d.status,
+                  last_frame_at: "now",
+                }
+              : d
+          ),
+        }));
       }
+      // If it was a persisted alert, add to alerts feed
+      if (msg.event === "BLOCKAGE_ALERT" && msg.persisted) {
+        setState((s) => ({
+          ...s,
+          alerts: [
+            {
+              id: Date.now(),
+              drain_id: msg.drain_id ?? "",
+              drain_name: msg.drain_name ?? "",
+              ward: msg.ward ?? "",
+              risk_index: msg.risk_index ?? 0,
+              kind: (msg.kind as AlertEvent["kind"]) ?? "blockage",
+              message: msg.message ?? "",
+              detected_at: msg.timestamp ?? new Date().toISOString(),
+            },
+            ...s.alerts,
+          ].slice(0, 50),
+        }));
+      }
+      break;
 
-      return {
+    case "DISPATCH":
+      // Refresh full state from backend to get accurate ticket/crew/drain state
+      simStore.refreshFromAPI();
+      break;
+
+    case "TICKET_RESOLVED":
+    case "TICKET_ESCALATED":
+      simStore.refreshFromAPI();
+      break;
+
+    case "STORM_ACTIVATED":
+      setState((s) => ({
         ...s,
-        tickets: nextTickets,
-        drains: s.drains.map((d) => (d.id === drainId ? { ...d, status: "dispatched" as const } : d)),
-        crews: s.crews.map((c) => (c.name === crewName ? { ...c, available: false } : c)),
-        alerts: [
-          { id: `A-${Date.now()}`, drainId, drainName: drain.name, ward: drain.ward, ri: drain.riskIndex, at: Date.now(), kind: "dispatch" as const, message: `${crewName} dispatched — ETA ${etaMin}m` },
-          ...s.alerts,
-        ],
-      };
-    });
-  },
-  resolveTicket(ticketId: string) {
-    const ticket = state.tickets.find((t) => t.id === ticketId);
-    if (!ticket) return;
-
-    setState((s) => ({
-      ...s,
-      tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "resolved" as const } : t)),
-      drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, status: "ok" as const, riskIndex: 15, blockagePct: 10 } : d)),
-      crews: ticket.crew ? s.crews.map((c) => (c.name === ticket.crew ? { ...c, available: true } : c)) : s.crews,
-      alerts: [
-        {
-          id: `A-${Date.now()}`,
-          drainId: ticket.drainId,
-          drainName: ticket.drainName,
-          ward: ticket.ward,
-          ri: 15,
-          at: Date.now(),
-          kind: "blockage" as const,
-          message: `Ticket ${ticketId} resolved — site cleared by ${ticket.crew || "field crew"}`,
-        },
-        ...s.alerts,
-      ],
-    }));
-  },
-  escalateTicket(ticketId: string) {
-    const ticket = state.tickets.find((t) => t.id === ticketId);
-    if (!ticket) return;
-
-    setState((s) => {
-      const nextRI = Math.min(100, ticket.riskIndex + 15);
-      return {
-        ...s,
-        tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, riskIndex: nextRI } : t)),
-        drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, riskIndex: nextRI, status: "critical" as const } : d)),
+        stormMode: true,
         alerts: [
           {
-            id: `A-${Date.now()}`,
-            drainId: ticket.drainId,
-            drainName: ticket.drainName,
-            ward: ticket.ward,
-            ri: nextRI,
-            at: Date.now(),
+            id: Date.now(),
+            drain_id: "SYS",
+            drain_name: "IMD WEATHER FUSION",
+            ward: "ALL WARDS",
+            risk_index: 95,
             kind: "weather" as const,
-            message: `CRITICAL ESCALATION for ticket ${ticketId} — Senior Engineer requested.`,
+            message: msg.message ?? "FLASH FLOOD WARNING",
+            detected_at: msg.timestamp ?? new Date().toISOString(),
           },
           ...s.alerts,
         ],
-      };
+      }));
+      // Refresh drains to get updated values
+      fetchDrains().then((drains) => setState((s) => ({ ...s, drains }))).catch(() => {});
+      break;
+
+    case "STORM_DEACTIVATED":
+      setState((s) => ({ ...s, stormMode: false }));
+      fetchDrains().then((drains) => setState((s) => ({ ...s, drains }))).catch(() => {});
+      break;
+  }
+}
+
+// ── Public Store API ────────────────────────────────────────────────────────
+export const simStore = {
+  getState: () => state,
+
+  subscribe(l: () => void) {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+
+  /** Load initial data from backend and connect WebSocket. */
+  async initialize() {
+    setState((s) => ({ ...s, loading: true }));
+
+    try {
+      const [drains, tickets, crews, alerts] = await Promise.all([
+        fetchDrains(),
+        fetchTickets(),
+        fetchCrews(),
+        fetchAlerts(),
+      ]);
+      setState((s) => ({
+        ...s,
+        drains,
+        tickets,
+        crews,
+        alerts,
+        loading: false,
+      }));
+    } catch (err) {
+      console.error("[store] Failed to load from API:", err);
+      setState((s) => ({ ...s, loading: false }));
+    }
+
+    // Connect WebSocket
+    onWebSocketMessage(handleWsMessage);
+    connectWebSocket();
+
+    // Track WS status
+    subscribeWsStatus(() => {
+      setState((s) => ({ ...s, wsStatus: getWsStatus() }));
     });
   },
-  toggleStorm() {
-    setState((s) => {
-      const next = !s.stormMode;
-      if (next) {
-        const bumped = s.drains.map((d) => {
-          const rf = Math.min(120, d.rainfallForecastMm + 35);
-          const bp = Math.min(99, d.blockagePct + Math.round(Math.random() * 18));
-          const ri = computeRI({ blockagePct: bp, rainfallForecastMm: rf, topoRisk: d.topoRisk });
-          return { ...d, rainfallForecastMm: rf, blockagePct: bp, riskIndex: ri, status: riStatus(ri) };
-        });
-        return {
-          ...s,
-          stormMode: true,
-          drains: bumped,
-          alerts: [
-            { id: `A-storm-${Date.now()}`, drainId: "SYS", drainName: "IMD WEATHER FUSION", ward: "ALL WARDS", ri: 95, at: Date.now(), kind: "weather" as const, message: "FLASH FLOOD WARNING — 60+mm/6h across monitored network" },
-            ...s.alerts,
-          ],
-        };
-      } else {
-        return { ...s, stormMode: false, drains: initialDrains, crews: initialCrews, tickets: initialTickets };
-      }
-    });
+
+  /** Re-fetch all data from the backend. */
+  async refreshFromAPI() {
+    try {
+      const [drains, tickets, crews, alerts] = await Promise.all([
+        fetchDrains(),
+        fetchTickets(),
+        fetchCrews(),
+        fetchAlerts(),
+      ]);
+      setState((s) => ({ ...s, drains, tickets, crews, alerts }));
+    } catch (err) {
+      console.error("[store] Refresh failed:", err);
+    }
   },
-  injectMockAlert() {
-    const candidates = state.drains.filter((d) => d.status !== "dispatched");
-    if (!candidates.length) return;
-    const target = candidates[Math.floor(Math.random() * candidates.length)];
-    const bp = Math.min(99, target.blockagePct + Math.round(5 + Math.random() * 20));
-    const ri = computeRI({ ...target, blockagePct: bp });
+
+  selectDrain(id: string | null) {
+    setState((s) => ({ ...s, selectedDrainId: id }));
+  },
+
+  async dismissDrain(drainId: string) {
+    const drain = state.drains.find((d) => d.id === drainId);
+    if (!drain) return;
+
+    // Optimistic update
     setState((s) => ({
       ...s,
-      drains: s.drains.map((d) => (d.id === target.id ? { ...d, blockagePct: bp, riskIndex: ri, status: riStatus(ri), lastFrameAt: "now" } : d)),
-      alerts: [
-        { id: `A-${Date.now()}`, drainId: target.id, drainName: target.name, ward: target.ward, ri, at: Date.now(), kind: "blockage" as const, message: `Blockage rising to ${bp}% — ${target.detected.join(", ") || "debris"}` },
-        ...s.alerts,
-      ].slice(0, 40),
+      drains: s.drains.map((d) =>
+        d.id === drainId ? { ...d, status: "dismissed" as const } : d
+      ),
+      selectedDrainId: s.selectedDrainId === drainId ? null : s.selectedDrainId,
+    }));
+
+    try {
+      await dismissDrainAPI(drainId);
+    } catch (err) {
+      console.error("[store] Dismiss failed:", err);
+      simStore.refreshFromAPI();
+    }
+  },
+
+  async dispatchCrew(drainId: string, crewName: string) {
+    // Optimistic update
+    setState((s) => ({
+      ...s,
+      drains: s.drains.map((d) =>
+        d.id === drainId ? { ...d, status: "dispatched" as const } : d
+      ),
+      crews: s.crews.map((c) =>
+        c.name === crewName ? { ...c, available: false } : c
+      ),
+    }));
+
+    try {
+      await dispatchCrewAPI(drainId, crewName);
+      await simStore.refreshFromAPI();
+    } catch (err) {
+      console.error("[store] Dispatch failed:", err);
+      simStore.refreshFromAPI();
+    }
+  },
+
+  async resolveTicket(ticketId: string) {
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) =>
+        t.id === ticketId ? { ...t, status: "resolved" as const } : t
+      ),
+    }));
+
+    try {
+      await resolveTicketAPI(ticketId);
+      await simStore.refreshFromAPI();
+    } catch (err) {
+      console.error("[store] Resolve failed:", err);
+      simStore.refreshFromAPI();
+    }
+  },
+
+  async escalateTicket(ticketId: string) {
+    try {
+      await escalateTicketAPI(ticketId);
+      await simStore.refreshFromAPI();
+    } catch (err) {
+      console.error("[store] Escalate failed:", err);
+    }
+  },
+
+  async toggleStorm() {
+    try {
+      const result = await toggleStormAPI();
+      setState((s) => ({ ...s, stormMode: result.storm_mode }));
+      // The WebSocket will push the updates, but also refresh
+      await simStore.refreshFromAPI();
+    } catch (err) {
+      console.error("[store] Storm toggle failed:", err);
+    }
+  },
+
+  dismissAlert(id: number) {
+    setState((s) => ({
+      ...s,
+      alerts: s.alerts.filter((a) => a.id !== id),
     }));
   },
 };
 
+// ── Hook ────────────────────────────────────────────────────────────────────
 export function useSimStore<T>(selector: (s: State) => T): T {
-  return useSyncExternalStore(simStore.subscribe, () => selector(simStore.getState()), () => selector(state));
-}
-
-// Global ticking
-let started = false;
-export function startSimulator() {
-  if (started || typeof window === "undefined") return;
-  started = true;
-  setInterval(() => simStore.injectMockAlert(), 52000);
+  return useSyncExternalStore(
+    simStore.subscribe,
+    () => selector(simStore.getState()),
+    () => selector(state),
+  );
 }

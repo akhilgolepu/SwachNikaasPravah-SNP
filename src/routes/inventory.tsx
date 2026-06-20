@@ -16,6 +16,7 @@ export const Route = createFileRoute("/inventory")({
 function InventoryPage() {
   const navigate = useNavigate();
   const drains = useSimStore((s) => s.drains);
+  const loading = useSimStore((s) => s.loading);
   const [ward, setWard] = useState("ALL");
   const [risk, setRisk] = useState("ALL");
   const [type, setType] = useState("ALL");
@@ -30,7 +31,7 @@ function InventoryPage() {
       if (risk === "OK" && d.status !== "ok") return false;
       if (type !== "ALL" && d.type !== type) return false;
       return true;
-    }).sort((a, b) => b.rainfallForecastMm - a.rainfallForecastMm);
+    }).sort((a, b) => b.rainfall_forecast_mm - a.rainfall_forecast_mm);
   }, [drains, ward, risk, type]);
 
   return (
@@ -38,7 +39,9 @@ function InventoryPage() {
       <header className="mb-6">
         <p className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Operations / Inventory</p>
         <h1 className="text-2xl font-semibold mt-2">Drain Inventory & Stream Matrix</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filtered.length} of {drains.length} assets · sorted by 6h rainfall forecast</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {loading ? "Loading..." : `${filtered.length} of ${drains.length} assets · sorted by 6h rainfall forecast`}
+        </p>
       </header>
 
       {/* Filter matrix */}
@@ -49,7 +52,10 @@ function InventoryPage() {
         ]} />
         <Select label="Typology" value={type} onChange={setType} options={["ALL", "Stormwater", "Combined", "Box Culvert"]} />
         <div className="flex items-end">
-          <button className="w-full h-10 border border-border bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2">
+          <button
+            onClick={() => simStore.refreshFromAPI()}
+            className="w-full h-10 border border-border bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2"
+          >
             <RefreshCw className="h-3 w-3" /> Force RTSP Recalibrate
           </button>
         </div>
@@ -81,15 +87,15 @@ function InventoryPage() {
                   </td>
                   <td className="px-4 py-3 text-[12px] text-muted-foreground">{d.type}</td>
                   <td className="px-4 py-3 text-right mono">
-                    <BlockBar pct={d.blockagePct} />
+                    <BlockBar pct={d.blockage_pct} />
                   </td>
-                  <td className="px-4 py-3 text-right mono">{d.rainfallForecastMm} mm</td>
+                  <td className="px-4 py-3 text-right mono">{d.rainfall_forecast_mm} mm</td>
                   <td className="px-4 py-3 text-right">
                     <span className={`mono text-base font-semibold ${
                       d.status === "critical" ? "text-risk-critical" :
                       d.status === "warning" ? "text-risk-warning" :
                       d.status === "dispatched" ? "text-primary" : "text-risk-ok"
-                    }`}>{d.riskIndex}</span>
+                    }`}>{d.risk_index}</span>
                   </td>
                   <td className="px-4 py-3 text-right mono text-[12px] text-muted-foreground">{d.uptime}%</td>
                   <td className="px-4 py-3 text-right">

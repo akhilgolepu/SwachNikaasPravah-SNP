@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useSimStore, simStore } from "@/lib/simStore";
 import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
 import { toast } from "sonner";
+import { getInferenceFrameURL } from "@/lib/api";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
@@ -85,16 +86,16 @@ function DispatchPage() {
                           <span className="mono text-[12px] font-medium">{t.id}</span>
                           <StatusPill s={t.status} />
                         </div>
-                        <div className="text-[13px] font-medium mt-1">{t.drainName}</div>
+                        <div className="text-[13px] font-medium mt-1">{t.drain_name}</div>
                         <div className="text-[11px] text-muted-foreground mt-0.5">
-                          {t.ward} · {t.createdAt}{t.crew ? ` · ${t.crew}` : ""}
+                          {t.ward} · {t.created_at}{t.crew ? ` · ${t.crew}` : ""}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className={`mono text-xl font-semibold ${
                           isEscalated ? "text-purple-400 font-bold" :
-                          t.riskIndex >= 70 ? "text-risk-critical" : t.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
-                        }`}>{t.riskIndex}</div>
+                          t.risk_index >= 70 ? "text-risk-critical" : t.risk_index >= 45 ? "text-risk-warning" : "text-risk-ok"
+                        }`}>{t.risk_index}</div>
                         <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
                       </div>
                     </div>
@@ -120,41 +121,37 @@ function DispatchPage() {
                 </div>
               )}
 
-              {/* Evidence vault */}
+              {/* Evidence vault — now with real backend frame */}
               <div className="bento" style={{ padding: 0 }}>
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <div>
                     <h3 className="text-[13px] font-semibold uppercase tracking-wider flex items-center gap-2">
                       <Camera className="h-3.5 w-3.5" /> Visual Evidence Vault
                     </h3>
-                    <p className="text-[11px] text-muted-foreground mono mt-1">Threshold breach frame · {selected.evidenceFrame}</p>
+                    <p className="text-[11px] text-muted-foreground mono mt-1">Threshold breach frame · {selected.evidence_frame}</p>
                   </div>
-                  <span className="mono text-[11px] text-muted-foreground">{selected.drainId}</span>
+                  <span className="mono text-[11px] text-muted-foreground">{selected.drain_id}</span>
                 </div>
                 <div className="relative aspect-[16/8] bg-black overflow-hidden">
+                  {/* Backend inference frame */}
+                  <img
+                    src={getInferenceFrameURL(selected.drain_id)}
+                    alt={`Evidence frame — ${selected.drain_id}`}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  {/* Fallback gradient */}
                   <div className="absolute inset-0" style={{
                     background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)",
                   }} />
                   <div className="absolute left-0 right-0 bottom-0 h-2/5" style={{
                     background: "linear-gradient(180deg, rgba(40,60,90,0.7), rgba(10,20,40,0.95))",
                   }} />
-                  <div className="absolute inset-x-10 bottom-10 h-14 border border-[#2a2a2a]" style={{
-                    backgroundImage: "repeating-linear-gradient(90deg, #1a1a1a 0 10px, #0a0a0a 10px 14px)",
-                  }} />
-                  {[...Array(8)].map((_, i) => (
-                    <div key={i} className="absolute h-2 w-3" style={{
-                      left: `${15 + i * 9}%`, bottom: `${28 + (i % 3) * 4}%`,
-                      background: i % 2 ? "#a89656" : "#7a5a3a",
-                    }} />
-                  ))}
-                  <div className={`absolute border-2 ${selected.status === "escalated" ? "border-purple-500" : "border-risk-critical"}`} style={{ left: "22%", top: "50%", width: "35%", height: "35%" }}>
-                    <span className={`absolute -top-5 left-0 text-[10px] mono px-1.5 text-white ${selected.status === "escalated" ? "bg-purple-600" : "bg-risk-critical"}`}>plastic 0.94</span>
-                  </div>
                   <div className="absolute top-3 left-3 px-2 py-1 bg-black/70 border border-border">
                     <span className="text-[10px] mono uppercase tracking-widest text-white">REC · CH-014</span>
                   </div>
                   <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/70 border border-border">
-                    <span className="text-[10px] mono text-white">{selected.evidenceFrame}</span>
+                    <span className="text-[10px] mono text-white">{selected.evidence_frame}</span>
                   </div>
                 </div>
               </div>
@@ -188,14 +185,14 @@ function DispatchPage() {
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <div className="mono text-sm font-medium">{c.distanceKm} km</div>
-                            <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                            <div className="mono text-sm font-medium">{c.distance_km} km</div>
+                            <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distance_km * 4)}m</div>
                           </div>
                           <button
                             disabled={!c.available || selected.status === "resolved"}
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              simStore.dispatchCrew(selected.drainId, c.name);
+                              await simStore.dispatchCrew(selected.drain_id, c.name);
                               toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
                               setSelectedCrewName(null);
                             }}
@@ -214,12 +211,11 @@ function DispatchPage() {
               <div className="grid grid-cols-3 gap-3">
                 <button
                   disabled={selected.status === "assigned" || selected.status === "in_progress" || selected.status === "resolved"}
-                  onClick={() => {
+                  onClick={async () => {
                     const availableCrews = crews.filter((c) => c.available);
                     if (availableCrews.length > 0) {
-                      const defaultCrew = availableCrews[0];
-                      const crewToDispatch = selectedCrewName || (defaultCrew ? defaultCrew.name : "Crew Alpha");
-                      simStore.dispatchCrew(selected.drainId, crewToDispatch);
+                      const crewToDispatch = selectedCrewName || availableCrews[0].name;
+                      await simStore.dispatchCrew(selected.drain_id, crewToDispatch);
                       toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
                       setSelectedCrewName(null);
                     }
@@ -230,11 +226,11 @@ function DispatchPage() {
                 </button>
                 <button
                   disabled={selected.status === "resolved"}
-                  onClick={() => {
+                  onClick={async () => {
                     setResolvingIds((prev) => [...prev, selected.id]);
                     toast.success("Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.");
-                    setTimeout(() => {
-                      simStore.resolveTicket(selected.id);
+                    setTimeout(async () => {
+                      await simStore.resolveTicket(selected.id);
                       setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
                     }, 500);
                   }}
@@ -244,8 +240,8 @@ function DispatchPage() {
                 </button>
                 <button
                   disabled={selected.status === "resolved" || selected.status === "escalated"}
-                  onClick={() => {
-                    simStore.escalateTicket(selected.id);
+                  onClick={async () => {
+                    await simStore.escalateTicket(selected.id);
                     toast.info("Ticket escalated to Ward Engineer.");
                   }}
                   className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors disabled:opacity-40"
