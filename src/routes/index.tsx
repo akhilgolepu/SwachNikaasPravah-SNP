@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AlertFeed } from "@/components/AlertFeed";
 import { MapCanvas } from "@/components/MapCanvas";
+import { InspectionDrawer } from "@/components/InspectionDrawer";
 import { useSimStore } from "@/lib/simStore";
 
 export const Route = createFileRoute("/")({
@@ -34,8 +35,9 @@ function DashboardPage() {
         <div className="col-span-12 lg:col-span-4 min-h-0">
           <AlertFeed />
         </div>
-        <div className="col-span-12 lg:col-span-8 min-h-0">
+        <div className="col-span-12 lg:col-span-8 min-h-0 relative overflow-hidden">
           <MapCanvas />
+          <InspectionDrawer />
         </div>
       </section>
     </main>
