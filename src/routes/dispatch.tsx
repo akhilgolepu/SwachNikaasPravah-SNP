@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
 import { toast } from "sonner";
 import { simStore, useSimStore } from "@/lib/simStore";
+import { motion } from "framer-motion";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
     meta: [
-      { title: "Dispatch & Ticket Control — DrainageAI" },
+      { title: "Dispatch & Ticket Control — SwachNikaasPravah-SNP" },
       { name: "description", content: "Convert AI insights into field maintenance dispatch tickets." },
     ],
   }),
@@ -118,9 +119,12 @@ function DispatchPage() {
                 const isEsc = t.status === "escalated";
                 const isPurging = purging === t.id;
                 return (
-                  <button
+                  <motion.div
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
+                    role="button"
+                    tabIndex={0}
+                    whileHover={{ translateY: -2, boxShadow: "0 0 15px rgba(0, 102, 255, 0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}
                     style={{
                       transition: "all 500ms cubic-bezier(0.4, 0, 0.2, 1)",
                       opacity: isPurging ? 0 : isResolving ? 0 : 1,
@@ -129,16 +133,16 @@ function DispatchPage() {
                       paddingTop: isResolving ? "0px" : "20px",
                       paddingBottom: isResolving ? "0px" : "20px",
                     }}
-                    className={`w-full text-left px-6 border-b border-white/5 transition-all duration-500 ease-in-out transform origin-top overflow-hidden text-white ${
+                    className={`w-full text-left px-6 border-b border-white/5 transition-all duration-300 ease-in-out origin-top overflow-hidden text-white cursor-pointer ${
                       isResolving ? "py-0 border-b-transparent pointer-events-none" : ""
                     } ${
                       isEsc
                         ? isSel
                           ? "bg-[#7000FF]/40 border-l-4 border-l-[#7000FF] shadow-[inset_10px_0_20px_rgba(112,0,255,0.2)]"
-                          : "bg-[#7000FF]/10 border-l-2 border-l-[#7000FF]/50 hover:bg-[#7000FF]/20"
+                          : "bg-[#7000FF]/10 border-l-2 border-l-[#7000FF]/50"
                         : isSel
                         ? "bg-[#0066FF]/20 border-l-4 border-l-[#0066FF] shadow-[inset_10px_0_20px_rgba(0,102,255,0.2)]"
-                        : "hover:bg-white/5 border-l-4 border-l-transparent"
+                        : "border-l-4 border-l-transparent"
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -160,7 +164,7 @@ function DispatchPage() {
                         <div className="text-[9px] mono uppercase tracking-widest text-white/40 mt-1">RI</div>
                       </div>
                     </div>
-                  </button>
+                  </motion.div>
                 );
               })}
             </div>
@@ -172,13 +176,17 @@ function DispatchPage() {
             <>
               {/* Diagnostic Info Banner */}
               {selected.status === "escalated" && (
-                <div className="bg-purple-950/40 border border-purple-500/30 p-4 text-purple-200 text-[12px] flex items-start gap-3 rounded animate-pulse">
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-purple-950/40 border border-purple-500/30 p-4 text-purple-200 text-[12px] flex items-start gap-3 rounded animate-pulse"
+                >
                   <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0 mt-0.5" />
                   <div>
                     <div className="font-semibold uppercase tracking-wider text-purple-300">Diagnostic Info: Ward Engineering Overload</div>
                     <p className="mt-1 text-purple-300/80">Hydraulic surge detected in local downstream branch. Diverting emergency auxiliary flow sensors. Dispatch protocol upgraded to level 2 (Senior Engineer inspection required).</p>
                   </div>
-                </div>
+                </motion.div>
               )}
 
               {/* Evidence vault */}
@@ -227,10 +235,11 @@ function DispatchPage() {
                   {crews.map((c) => {
                     const isPicked = selectedCrewId === c.id;
                     return (
-                      <div
+                      <motion.div
                         key={c.id}
-                        className={`px-6 py-5 border-b border-white/5 flex items-center justify-between transition-colors ${
-                          c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? "cursor-pointer hover:bg-white/5" : ""
+                        whileHover={c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? { translateY: -2, boxShadow: "0 0 10px rgba(0, 102, 255, 0.1)", backgroundColor: "rgba(255,255,255,0.03)" } : {}}
+                        className={`px-6 py-5 border-b border-white/5 flex items-center justify-between transition-all duration-300 ${
+                          c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? "cursor-pointer" : ""
                         } ${
                           isPicked ? "bg-[#0066FF]/10 border-l-4 border-l-[#0066FF]" : "border-l-4 border-l-transparent"
                         }`}
@@ -248,34 +257,38 @@ function DispatchPage() {
                             <div className="mono text-lg font-bold text-white">{c.distanceKm} km</div>
                             <div className="text-[10px] mono text-[#00F2FF]">ETA ~{Math.round(c.distanceKm * 4)}m</div>
                           </div>
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.1, boxShadow: "0 0 10px rgba(0, 102, 255, 0.3)" }}
                             disabled={!c.available || selected.status === "resolved" || selected.status === "false_positive"}
                             onClick={(e) => { e.stopPropagation(); setSelectedCrewId(isPicked ? null : c.id); }}
                             className={`px-4 h-10 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                               isPicked 
                                 ? "bg-[#0066FF] text-white shadow-[0_0_15px_rgba(0,102,255,0.5)] border-transparent" 
-                                : "bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                                : "bg-brand-primary text-white"
                             }`}
                           >
                             {isPicked ? "Selected" : "Assign"}
-                          </button>
+                          </motion.button>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(0, 102, 255, 0.4)" }}
                   onClick={handleDispatch}
                   disabled={selected.status === "in_progress" || selected.status === "resolved" || selected.status === "false_positive"}
-                  className="h-14 rounded-xl bg-[#0066FF] text-white hover:bg-[#0052CC] text-[12px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(0,102,255,0.4)]"
+                  className="h-14 rounded-xl bg-[#0066FF] text-white text-[12px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed relative overflow-hidden"
                 >
                   Dispatch Crew <ArrowUpRight className="h-4 w-4" />
-                </button>
+                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent hover:animate-[shimmer_1.5s_infinite]" />
+                </motion.button>
                 {selected.status === "in_progress" ? (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05, borderColor: "var(--status-ok)" }}
                     disabled={selected.status === "resolved"}
                     onClick={() => {
                       setResolvingIds((prev) => [...prev, selected.id]);
@@ -285,26 +298,28 @@ function DispatchPage() {
                         setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
                       }, 500);
                     }}
-                    className="h-14 rounded-xl border-2 border-[#17C964] text-[#17C964] text-[12px] font-bold uppercase tracking-widest hover:bg-[#17C964] hover:text-black transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(23,201,100,0.2)]"
+                    className="h-14 rounded-xl border-2 border-[#17C964] text-[#17C964] text-[12px] font-bold uppercase tracking-widest transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(23,201,100,0.2)]"
                   >
                     Resolve Ticket
-                  </button>
+                  </motion.button>
                 ) : (
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05, borderColor: "var(--brand-primary)" }}
                     disabled={selected.status === "resolved" || selected.status === "false_positive"}
                     onClick={handleFalsePositive}
-                    className="h-14 rounded-xl border-2 border-white/10 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/30 hover:bg-white/5 transition-all disabled:opacity-30"
+                    className="h-14 rounded-xl border-2 border-white/10 text-white text-[12px] font-bold uppercase tracking-widest transition-all disabled:opacity-30"
                   >
                     False Positive
-                  </button>
+                  </motion.button>
                 )}
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05, backgroundColor: "var(--status-critical)", color: "white" }}
                   disabled={selected.status === "resolved" || selected.status === "false_positive" || selected.status === "escalated"}
                   onClick={handleEscalate}
-                  className="h-14 rounded-xl border-2 border-[#F5A524] text-[#F5A524] text-[12px] font-bold uppercase tracking-widest hover:bg-[#F5A524] hover:text-black transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(245,165,36,0.2)]"
+                  className="h-14 rounded-xl border-2 border-[#F5A524] text-[#F5A524] text-[12px] font-bold uppercase tracking-widest transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(245,165,36,0.2)]"
                 >
                   Escalate · Sr. Engineer
-                </button>
+                </motion.button>
               </div>
             </>
           )}
@@ -316,14 +331,17 @@ function DispatchPage() {
 
 function StatTile({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="glass-card p-6 flex items-center justify-between relative overflow-hidden group">
+    <motion.div 
+      whileHover={{ translateY: -4, boxShadow: "0 0 20px rgba(0, 102, 255, 0.3)" }}
+      className="glass-card p-6 flex items-center justify-between relative overflow-hidden group transition-all duration-300"
+    >
       <div className="absolute inset-0 kinetic-gradient opacity-10 pointer-events-none transition-opacity group-hover:opacity-20" />
       <div className="relative z-10">
         <div className="text-[10px] mono uppercase tracking-widest text-white/40">{label}</div>
         <div className="mono text-4xl font-bold mt-2 text-white">{value}</div>
       </div>
-      <div className="h-14 w-14 rounded-2xl grid place-items-center bg-white/5 border border-white/10 relative z-10 shadow-lg">{icon}</div>
-    </div>
+      <div className="h-14 w-14 rounded-2xl grid place-items-center glass-card border border-white/10 relative z-10 shadow-lg">{icon}</div>
+    </motion.div>
   );
 }
 
