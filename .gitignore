@@ -39,3 +39,6 @@ __pycache__/
 drainage.db
 *.pt
 .env
+backend/videos/
+backend/runs/
+backend/ml_training/

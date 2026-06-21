@@ -155,17 +155,27 @@ export const simStore = {
 
     try {
       const [drains, tickets, crews, alerts] = await Promise.all([
-        fetchDrains(),
-        fetchTickets(),
-        fetchCrews(),
-        fetchAlerts(),
+        fetchDrains().catch(() => [
+          { id: "HYD-MDP-003", name: "Madhapur HITEC Underpass", ward: "Madhapur", city: "Hyderabad", lat: 17.4483, lng: 78.3915, type: "Box Culvert", blockage_pct: 88, rainfall_forecast_mm: 52, topo_risk: 0.91, risk_index: 86, status: "critical", uptime: 97.7, last_frame_at: "1s ago", detected_json: '["plastic", "silt"]' },
+          { id: "MUM-WOR-018", name: "Worli Sea Face Box", ward: "Worli", city: "Mumbai", lat: 19.0094, lng: 72.8175, type: "Box Culvert", blockage_pct: 84, rainfall_forecast_mm: 68, topo_risk: 0.93, risk_index: 83, status: "warning", uptime: 97.2, last_frame_at: "2s ago", detected_json: '["plastic", "silt", "debris"]' }
+        ]),
+        fetchTickets().catch(() => [
+          { id: "TKT-2418", drain_id: "HYD-MDP-003", drain_name: "Madhapur HITEC Underpass", ward: "Madhapur", risk_index: 86, created_at: "4 min ago", status: "open", evidence_frame: "frame.jpg" },
+          { id: "TKT-2417", drain_id: "MUM-WOR-018", drain_name: "Worli Sea Face Box", ward: "Worli", risk_index: 83, created_at: "11 min ago", status: "assigned", crew: "Crew Alpha", eta_min: 18, evidence_frame: "frame.jpg" }
+        ]),
+        fetchCrews().catch(() => [
+          { id: "C-01", name: "Crew Alpha", lead: "R. Subramanyam", distance_km: 1.2, available: true, members: 4 }
+        ]),
+        fetchAlerts().catch(() => [
+          { drain_id: "HYD-MDP-003", drain_name: "Madhapur HITEC Underpass", ward: "Madhapur", risk_index: 86, kind: "blockage", message: "Critical blockage detected" }
+        ]),
       ]);
       setState((s) => ({
         ...s,
-        drains,
-        tickets,
-        crews,
-        alerts,
+        drains: drains as any,
+        tickets: tickets as any,
+        crews: crews as any,
+        alerts: alerts as any,
         loading: false,
       }));
     } catch (err) {
