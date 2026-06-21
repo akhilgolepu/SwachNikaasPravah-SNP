@@ -1,14 +1,8 @@
 # Application Flow & User Experience Document (appflow.md)
 
-## Project: DrainageAI (v1.0)
-
-**Target Audience:** Frontend Developers / Hackathon UI Designers
-
----
-
 ## 1. Core UX Principles for GovTech Dashboards
 
-To impress hackathon judges, the user experience must completely reject generic admin template designs. It needs to mimic high-stakes, real-time command systems (like flight control or emergency dispatch).
+the user experience must completely reject generic admin template designs. It needs to mimic high-stakes, real-time command systems (like flight control or emergency dispatch).
 
 * **Dark Mode by Default:** Reduces eye strain for 24/7 ICCC operators and emphasizes neon alert states (Red/Amber/Green).
 * **Three-Click Rule to Action:** An operator must be able to view an alert, verify the visual evidence, and dispatch a field crew in **three clicks or fewer**.
@@ -58,8 +52,6 @@ The operational transition layer where automated insights convert to real-world 
 ---
 
 ## 3. Step-by-Step User Journeys (The Demo Flows)
-
-These two precise workflows should be used during your live hackathon pitch to showcase the execution capability of the software stack.
 
 ### Journey 1: Critical Alert Triage & Crew Dispatch (The Core Pitch Path)
 

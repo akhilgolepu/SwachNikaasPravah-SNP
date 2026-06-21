@@ -17,6 +17,14 @@ import {
   getWsStatus, subscribeWsStatus,
 } from "./websocket";
 
+// ── Focus Request Type (from redesign) ──────────────────────────────────────
+export interface FocusRequest {
+  drainId: string;
+  lat: number;
+  lng: number;
+  token: number;
+}
+
 // ── State Shape ─────────────────────────────────────────────────────────────
 export interface State {
   drains: Drain[];
@@ -25,6 +33,7 @@ export interface State {
   crews: Crew[];
   selectedDrainId: string | null;
   stormMode: boolean;
+  focus: FocusRequest | null;
   wsStatus: "connecting" | "connected" | "disconnected";
   loading: boolean;
 }
@@ -36,6 +45,7 @@ let state: State = {
   crews: [],
   selectedDrainId: null,
   stormMode: false,
+  focus: null,
   wsStatus: "disconnected",
   loading: true,
 };
@@ -192,6 +202,20 @@ export const simStore = {
     setState((s) => ({ ...s, selectedDrainId: id }));
   },
 
+  focusDrain(id: string) {
+    const d = state.drains.find((x) => x.id === id);
+    if (!d) return;
+    setState((s) => ({
+      ...s,
+      selectedDrainId: id,
+      focus: { drainId: id, lat: d.lat, lng: d.lng, token: Date.now() },
+    }));
+  },
+
+  clearFocus() {
+    setState((s) => ({ ...s, focus: null }));
+  },
+
   async dismissDrain(drainId: string) {
     const drain = state.drains.find((d) => d.id === drainId);
     if (!drain) return;
@@ -278,6 +302,10 @@ export const simStore = {
     }));
   },
 };
+
+if (typeof window !== "undefined") {
+  (window as any).simStore = simStore;
+}
 
 // ── Hook ────────────────────────────────────────────────────────────────────
 export function useSimStore<T>(selector: (s: State) => T): T {
