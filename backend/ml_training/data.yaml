@@ -1,0 +1,13 @@
+path: /home/akhil/DrainageAi/backend/ml_training
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 6
+names:
+  0: closed manhole-not overflowing-
+  1: drainage overflow-repair-
+  2: fake manhole
+  3: open drainage-not overflowing-
+  4: open drainage-overflowing-
+  5: open manhole-not overflowing-

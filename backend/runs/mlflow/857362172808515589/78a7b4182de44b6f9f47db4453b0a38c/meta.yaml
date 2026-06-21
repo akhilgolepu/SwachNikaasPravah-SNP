@@ -1,0 +1,14 @@
+artifact_uri: /home/akhil/DrainageAi/runs/mlflow/857362172808515589/78a7b4182de44b6f9f47db4453b0a38c/artifacts
+end_time: 1782025585498
+entry_point_name: ''
+experiment_id: '857362172808515589'
+lifecycle_stage: active
+run_id: 78a7b4182de44b6f9f47db4453b0a38c
+run_name: drain_base_model
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1782025571851
+status: 3
+tags: []
+user_id: akhil
