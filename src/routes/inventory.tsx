@@ -39,68 +39,76 @@ function InventoryPage() {
   }, [drains, ward, risk, type]);
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
+    <main className="space-y-8 relative z-10">
       <header className="mb-6">
-        <p className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Operations / Inventory</p>
-        <h1 className="text-2xl font-semibold mt-2">Drain Inventory & Stream Matrix</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filtered.length} of {drains.length} assets · sorted by 6h rainfall forecast</p>
+        <p className="text-[10px] mono uppercase tracking-widest text-[#00F2FF]">Operations / Inventory</p>
+        <h1 className="text-3xl font-semibold mt-2 text-white glow-text">Drain Inventory & Stream Matrix</h1>
+        <p className="text-sm text-white/60 mt-1">{filtered.length} of {drains.length} assets · sorted by 6h rainfall forecast</p>
       </header>
 
       {/* Filter matrix */}
-      <section className="bento mb-6 grid grid-cols-2 md:grid-cols-4 gap-4" style={{ padding: 20 }}>
-        <Select label="Ward" value={ward} onChange={setWard} options={wards} />
-        <Select label="Risk Class" value={risk} onChange={setRisk} options={[
-          { v: "ALL", l: "All" }, { v: "CRIT", l: "Critical" }, { v: "WARN", l: "Warning" }, { v: "OK", l: "Normal" }
-        ]} />
-        <Select label="Typology" value={type} onChange={setType} options={["ALL", "Stormwater", "Combined", "Box Culvert"]} />
-        <div className="flex items-end">
-          <button className="w-full h-10 border border-border bg-card hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2">
+      <section className="glass-card mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 p-6 relative overflow-hidden group">
+        <div className="absolute inset-0 kinetic-gradient opacity-10 pointer-events-none transition-opacity group-hover:opacity-20" />
+        <div className="relative z-10 flex flex-col gap-1.5 justify-center">
+          <Select label="Ward" value={ward} onChange={setWard} options={wards} />
+        </div>
+        <div className="relative z-10 flex flex-col gap-1.5 justify-center">
+          <Select label="Risk Class" value={risk} onChange={setRisk} options={[
+            { v: "ALL", l: "All" }, { v: "CRIT", l: "Critical" }, { v: "WARN", l: "Warning" }, { v: "OK", l: "Normal" }
+          ]} />
+        </div>
+        <div className="relative z-10 flex flex-col gap-1.5 justify-center">
+          <Select label="Typology" value={type} onChange={setType} options={["ALL", "Stormwater", "Combined", "Box Culvert"]} />
+        </div>
+        <div className="relative z-10 flex items-end">
+          <button className="w-full h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-[#0066FF] hover:border-[#0066FF] hover:shadow-[0_0_20px_rgba(0,102,255,0.4)] transition-all text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2 text-white">
             <RefreshCw className="h-3 w-3" /> Force RTSP Recalibrate
           </button>
         </div>
       </section>
 
       {/* Table */}
-      <div className="bento" style={{ padding: 0 }}>
-        <div className="overflow-x-auto">
+      <div className="glass-card p-0 overflow-hidden relative group">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/5 pointer-events-none" />
+        <div className="overflow-x-auto relative z-10">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-[10px] mono uppercase tracking-widest text-muted-foreground">
-                <th className="text-left px-4 py-3 font-medium">Camera ID</th>
-                <th className="text-left px-4 py-3 font-medium">Location</th>
-                <th className="text-left px-4 py-3 font-medium">Type</th>
-                <th className="text-right px-4 py-3 font-medium">Blockage</th>
-                <th className="text-right px-4 py-3 font-medium">Forecast 6h</th>
-                <th className="text-right px-4 py-3 font-medium">RI</th>
-                <th className="text-right px-4 py-3 font-medium">Uptime</th>
-                <th className="text-right px-4 py-3 font-medium">Action</th>
+              <tr className="border-b border-white/10 text-[10px] mono uppercase tracking-widest text-white/40 bg-white/5">
+                <th className="text-left px-6 py-4 font-medium">Camera ID</th>
+                <th className="text-left px-6 py-4 font-medium">Location</th>
+                <th className="text-left px-6 py-4 font-medium">Type</th>
+                <th className="text-right px-6 py-4 font-medium">Blockage</th>
+                <th className="text-right px-6 py-4 font-medium">Forecast 6h</th>
+                <th className="text-right px-6 py-4 font-medium">RI</th>
+                <th className="text-right px-6 py-4 font-medium">Uptime</th>
+                <th className="text-right px-6 py-4 font-medium">Action</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((d) => (
-                <tr key={d.id} className="border-b border-border hover:bg-surface-2">
-                  <td className="px-4 py-3 mono text-[12px]">{d.id}</td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{d.name}</div>
-                    <div className="text-[11px] text-muted-foreground">{d.ward} · {d.city}</div>
+                <tr key={d.id} className="border-b border-white/5 hover:bg-white/10 transition-colors text-white">
+                  <td className="px-6 py-4 mono text-[12px]">{d.id}</td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-white">{d.name}</div>
+                    <div className="text-[11px] text-white/50">{d.ward} · {d.city}</div>
                   </td>
-                  <td className="px-4 py-3 text-[12px] text-muted-foreground">{d.type}</td>
-                  <td className="px-4 py-3 text-right mono">
+                  <td className="px-6 py-4 text-[12px] text-white/50">{d.type}</td>
+                  <td className="px-6 py-4 text-right mono">
                     <BlockBar pct={d.blockagePct} />
                   </td>
-                  <td className="px-4 py-3 text-right mono">{d.rainfallForecastMm} mm</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-6 py-4 text-right mono">{d.rainfallForecastMm} mm</td>
+                  <td className="px-6 py-4 text-right">
                     <span className={`mono text-base font-semibold ${
-                      d.status === "critical" ? "text-risk-critical" :
-                      d.status === "warning" ? "text-risk-warning" :
-                      d.status === "dispatched" ? "text-primary" : "text-risk-ok"
+                      d.status === "critical" ? "text-[#FF3B3B] drop-shadow-[0_0_8px_rgba(255,59,59,0.8)] animate-pulse" :
+                      d.status === "warning" ? "text-[#F5A524] drop-shadow-[0_0_8px_rgba(245,165,36,0.8)]" :
+                      d.status === "dispatched" ? "text-[#0066FF]" : "text-[#17C964]"
                     }`}>{d.riskIndex}</span>
                   </td>
-                  <td className="px-4 py-3 text-right mono text-[12px] text-muted-foreground">{d.uptime}%</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-6 py-4 text-right mono text-[12px] text-white/50">{d.uptime}%</td>
+                  <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => inspect(d.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 border border-border text-[10px] mono uppercase tracking-widest hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 text-[10px] mono uppercase tracking-widest hover:bg-[#0066FF] hover:border-[#0066FF] hover:shadow-[0_0_15px_rgba(0,102,255,0.5)] transition-all text-white"
                     >
                       <Wrench className="h-3 w-3" /> Inspect
                     </button>
@@ -122,17 +130,17 @@ function Select({
   options: (string | { v: string; l: string })[];
 }) {
   return (
-    <label className="block">
-      <div className="text-[10px] mono uppercase tracking-widest text-muted-foreground mb-1.5">{label}</div>
+    <label className="block w-full">
+      <div className="text-[10px] mono uppercase tracking-widest text-white/40 mb-1.5">{label}</div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 px-3 bg-background border border-border text-sm focus:outline-none focus:border-primary"
+        className="w-full h-10 px-3 rounded-xl bg-black/40 border border-white/10 text-sm text-white focus:outline-none focus:border-[#0066FF] focus:ring-1 focus:ring-[#0066FF]/50 transition-all"
       >
         {options.map((o) => {
           const v = typeof o === "string" ? o : o.v;
           const l = typeof o === "string" ? o : o.l;
-          return <option key={v} value={v}>{l}</option>;
+          return <option key={v} value={v} className="bg-[#121212] text-white">{l}</option>;
         })}
       </select>
     </label>
@@ -140,11 +148,11 @@ function Select({
 }
 
 function BlockBar({ pct }: { pct: number }) {
-  const color = pct >= 70 ? "bg-risk-critical" : pct >= 45 ? "bg-risk-warning" : "bg-risk-ok";
+  const color = pct >= 70 ? "bg-[#FF3B3B] shadow-[0_0_10px_rgba(255,59,59,0.8)]" : pct >= 45 ? "bg-[#F5A524]" : "bg-[#17C964]";
   return (
     <div className="flex items-center gap-2 justify-end">
-      <div className="w-20 h-1.5 bg-border">
-        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div className={`h-full rounded-full ${color} transition-all duration-1000`} style={{ width: `${pct}%` }} />
       </div>
       <span className="mono text-[12px] w-10 text-right">{pct}%</span>
     </div>
