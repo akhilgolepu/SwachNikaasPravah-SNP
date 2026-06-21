@@ -1,19 +1,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { useSimStore, simStore } from '@/lib/simStore';
 
 interface AlertItemProps {
+  id: string;
   name: string;
   risk: number;
-  status: 'critical' | 'warning';
+  status: string;
   location: string;
+  onClick: () => void;
 }
 
-const AlertItem: React.FC<AlertItemProps> = ({ name, risk, status, location }) => {
+const AlertItem: React.FC<AlertItemProps> = ({ id, name, risk, status, location, onClick }) => {
   const isCritical = status === 'critical';
   
   return (
     <motion.div
+      onClick={onClick}
       whileHover={{ x: 10 }}
       className={`p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer group relative overflow-hidden ${
         isCritical ? 'animate-shimmer' : ''
@@ -50,6 +54,12 @@ const AlertItem: React.FC<AlertItemProps> = ({ name, risk, status, location }) =
 };
 
 export const RefinedAlertFeed: React.FC = () => {
+  const drains = useSimStore((s) => s.drains);
+  const activeAlerts = drains
+    .filter((d) => d.status === 'critical' || d.status === 'warning')
+    .sort((a, b) => b.riskIndex - a.riskIndex)
+    .slice(0, 10);
+
   return (
     <motion.aside
       initial={{ x: -50, opacity: 0 }}
@@ -67,24 +77,21 @@ export const RefinedAlertFeed: React.FC = () => {
       </div>
       
       <div className="flex-1 p-4 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-        <AlertItem
-          name="Worli Sea Face Box"
-          risk={98}
-          status="critical"
-          location="Worli, Mumbai"
-        />
-        <AlertItem
-          name="Madhapur Underpass"
-          risk={84}
-          status="critical"
-          location="Madhapur, Hyderabad"
-        />
-        <AlertItem
-          name="BKC Connector Drain"
-          risk={72}
-          status="warning"
-          location="Bandra, Mumbai"
-        />
+        {activeAlerts.length === 0 ? (
+          <div className="text-center text-white/40 mt-10 text-sm mono">No active alerts</div>
+        ) : (
+          activeAlerts.map((drain) => (
+            <AlertItem
+              key={drain.id}
+              id={drain.id}
+              name={drain.name}
+              risk={drain.riskIndex}
+              status={drain.status}
+              location={`${drain.ward}, ${drain.city}`}
+              onClick={() => simStore.focusDrain(drain.id)}
+            />
+          ))
+        )}
       </div>
     </motion.aside>
   );

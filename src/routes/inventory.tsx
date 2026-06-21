@@ -2,11 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { simStore, useSimStore } from "@/lib/simStore";
 import { RefreshCw, Wrench } from "lucide-react";
+import { motion } from "framer-motion";
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({
     meta: [
-      { title: "Drain Inventory & Stream Matrix — DrainageAI" },
+      { title: "Drain Inventory & Stream Matrix — SwachNikaasPravah-SNP" },
       { name: "description", content: "High-density audit grid of every monitored stormwater asset." },
     ],
   }),
@@ -47,7 +48,12 @@ function InventoryPage() {
       </header>
 
       {/* Filter matrix */}
-      <section className="glass-card mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 p-6 relative overflow-hidden group">
+      <motion.section 
+        initial={{ y: 20, opacity: 0 }} 
+        animate={{ y: 0, opacity: 1 }} 
+        transition={{ delay: 0.1 }}
+        className="glass-card mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 p-6 relative overflow-hidden group"
+      >
         <div className="absolute inset-0 kinetic-gradient opacity-10 pointer-events-none transition-opacity group-hover:opacity-20" />
         <div className="relative z-10 flex flex-col gap-1.5 justify-center">
           <Select label="Ward" value={ward} onChange={setWard} options={wards} />
@@ -61,11 +67,16 @@ function InventoryPage() {
           <Select label="Typology" value={type} onChange={setType} options={["ALL", "Stormwater", "Combined", "Box Culvert"]} />
         </div>
         <div className="relative z-10 flex items-end">
-          <button className="w-full h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-[#0066FF] hover:border-[#0066FF] hover:shadow-[0_0_20px_rgba(0,102,255,0.4)] transition-all text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2 text-white">
+          <motion.button 
+            whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(0, 102, 255, 0.4)" }}
+            className="w-full h-10 rounded-xl border border-white/10 bg-[#0066FF] transition-all text-[11px] mono uppercase tracking-widest flex items-center justify-center gap-2 text-white relative overflow-hidden"
+          >
             <RefreshCw className="h-3 w-3" /> Force RTSP Recalibrate
-          </button>
+            {/* Shimmer overlay */}
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent hover:animate-[shimmer_1.5s_infinite]" />
+          </motion.button>
         </div>
-      </section>
+      </motion.section>
 
       {/* Table */}
       <div className="glass-card p-0 overflow-hidden relative group">
@@ -86,7 +97,11 @@ function InventoryPage() {
             </thead>
             <tbody>
               {filtered.map((d) => (
-                <tr key={d.id} className="border-b border-white/5 hover:bg-white/10 transition-colors text-white">
+                <motion.tr 
+                  key={d.id} 
+                  whileHover={{ translateY: -2, boxShadow: "0 0 15px rgba(0, 102, 255, 0.2)", backgroundColor: "rgba(255,255,255,0.05)" }}
+                  className="border-b border-white/5 transition-all duration-300 text-white"
+                >
                   <td className="px-6 py-4 mono text-[12px]">{d.id}</td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-white">{d.name}</div>
@@ -106,14 +121,15 @@ function InventoryPage() {
                   </td>
                   <td className="px-6 py-4 text-right mono text-[12px] text-white/50">{d.uptime}%</td>
                   <td className="px-6 py-4 text-right">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
                       onClick={() => inspect(d.id)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 text-[10px] mono uppercase tracking-widest hover:bg-[#0066FF] hover:border-[#0066FF] hover:shadow-[0_0_15px_rgba(0,102,255,0.5)] transition-all text-white"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 text-[10px] mono uppercase tracking-widest bg-[#0066FF] shadow-[0_0_15px_rgba(0,102,255,0.3)] transition-all text-white"
                     >
                       <Wrench className="h-3 w-3" /> Inspect
-                    </button>
+                    </motion.button>
                   </td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
@@ -152,7 +168,12 @@ function BlockBar({ pct }: { pct: number }) {
   return (
     <div className="flex items-center gap-2 justify-end">
       <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-1000`} style={{ width: `${pct}%` }} />
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className={`h-full rounded-full ${color}`} 
+        />
       </div>
       <span className="mono text-[12px] w-10 text-right">{pct}%</span>
     </div>

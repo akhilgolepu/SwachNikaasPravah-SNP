@@ -13,7 +13,7 @@ import { RefinedMapContainer } from "@/components/RefinedMapContainer";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ICCC Map Dashboard — DrainageAI v2.0" },
+      { title: "ICCC Map Dashboard — SwachNikaasPravah-SNP v2.0" },
       { name: "description", content: "Real-time GIS canvas plotting active drain risk across Hyderabad and Mumbai." },
     ],
   }),
