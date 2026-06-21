@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import {
   initialDrains,
   initialTickets,
-  crews as initialCrews,
+  initialCrews,
   computeRI,
   riStatus,
   type Drain,
@@ -21,25 +21,34 @@ export interface AlertEvent {
   message: string;
 }
 
+export interface FocusRequest {
+  drainId: string;
+  lat: number;
+  lng: number;
+  token: number;
+}
+
 interface State {
   drains: Drain[];
   tickets: Ticket[];
+  crews: Crew[];
   alerts: AlertEvent[];
   selectedDrainId: string | null;
   stormMode: boolean;
-  crews: Crew[];
+  focus: FocusRequest | null;
 }
 
 let state: State = {
   drains: initialDrains,
   tickets: initialTickets,
+  crews: initialCrews,
   alerts: [
     { id: "A-init-1", drainId: "HYD-MDP-003", drainName: "Madhapur HITEC Underpass", ward: "Madhapur", ri: 86, at: Date.now() - 240000, kind: "blockage", message: "Critical blockage detected — plastic + silt" },
     { id: "A-init-2", drainId: "MUM-WOR-018", drainName: "Worli Sea Face Box", ward: "Worli", ri: 83, at: Date.now() - 660000, kind: "weather", message: "68mm/6h forecast — high cascade risk" },
   ],
   selectedDrainId: null,
   stormMode: false,
-  crews: initialCrews,
+  focus: null,
 };
 
 const listeners = new Set<() => void>();
@@ -52,7 +61,21 @@ function setState(updater: (s: State) => State) {
 export const simStore = {
   getState: () => state,
   subscribe(l: () => void) { listeners.add(l); return () => listeners.delete(l); },
+
   selectDrain(id: string | null) { setState((s) => ({ ...s, selectedDrainId: id })); },
+
+  focusDrain(id: string) {
+    const d = state.drains.find((x) => x.id === id);
+    if (!d) return;
+    setState((s) => ({
+      ...s,
+      selectedDrainId: id,
+      focus: { drainId: id, lat: d.lat, lng: d.lng, token: Date.now() },
+    }));
+  },
+
+  clearFocus() { setState((s) => ({ ...s, focus: null })); },
+
   dismissAlert(id: string) {
     setState((s) => ({ ...s, alerts: s.alerts.filter((a) => a.id !== id) }));
   },
@@ -78,6 +101,7 @@ export const simStore = {
       ],
     }));
   },
+
   dispatchCrew(drainId: string, crewName: string) {
     const drain = state.drains.find((d) => d.id === drainId);
     if (!drain) return;
@@ -125,6 +149,7 @@ export const simStore = {
       };
     });
   },
+
   resolveTicket(ticketId: string) {
     const ticket = state.tickets.find((t) => t.id === ticketId);
     if (!ticket) return;
@@ -149,6 +174,7 @@ export const simStore = {
       ],
     }));
   },
+
   escalateTicket(ticketId: string) {
     const ticket = state.tickets.find((t) => t.id === ticketId);
     if (!ticket) return;
@@ -157,7 +183,7 @@ export const simStore = {
       const nextRI = Math.min(100, ticket.riskIndex + 15);
       return {
         ...s,
-        tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, riskIndex: nextRI } : t)),
+        tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "escalated" as const, riskIndex: nextRI } : t)),
         drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, riskIndex: nextRI, status: "critical" as const } : d)),
         alerts: [
           {
@@ -174,6 +200,33 @@ export const simStore = {
         ],
       };
     });
+  },
+
+  // Dispatch screen: send crew for an existing ticket
+  dispatchTicket(ticketId: string, crewName: string) {
+    const ticket = state.tickets.find((t) => t.id === ticketId);
+    if (!ticket) return;
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) =>
+        t.id === ticketId
+          ? { ...t, status: "in_progress" as const, crew: crewName, etaMin: t.etaMin ?? Math.round(8 + Math.random() * 20) }
+          : t,
+      ),
+      drains: s.drains.map((d) => (d.id === ticket.drainId ? { ...d, status: "dispatched" as const } : d)),
+      crews: s.crews.map((c) => (c.name === crewName ? { ...c, available: false } : c)),
+      alerts: [
+        { id: `A-${Date.now()}`, drainId: ticket.drainId, drainName: ticket.drainName, ward: ticket.ward, ri: ticket.riskIndex, at: Date.now(), kind: "dispatch" as const, message: `${crewName} dispatched — ETA ~15m` },
+        ...s.alerts,
+      ],
+    }));
+  },
+
+  markFalsePositive(ticketId: string) {
+    setState((s) => ({
+      ...s,
+      tickets: s.tickets.map((t) => (t.id === ticketId ? { ...t, status: "false_positive" as const } : t)),
+    }));
   },
   toggleStorm() {
     setState((s) => {
@@ -199,8 +252,9 @@ export const simStore = {
       }
     });
   },
+
   injectMockAlert() {
-    const candidates = state.drains.filter((d) => d.status !== "dispatched");
+    const candidates = state.drains.filter((d) => d.status !== "dispatched" && d.status !== "dismissed");
     if (!candidates.length) return;
     const target = candidates[Math.floor(Math.random() * candidates.length)];
     const bp = Math.min(99, target.blockagePct + Math.round(5 + Math.random() * 20));
@@ -220,7 +274,6 @@ export function useSimStore<T>(selector: (s: State) => T): T {
   return useSyncExternalStore(simStore.subscribe, () => selector(simStore.getState()), () => selector(state));
 }
 
-// Global ticking
 let started = false;
 export function startSimulator() {
   if (started || typeof window === "undefined") return;
