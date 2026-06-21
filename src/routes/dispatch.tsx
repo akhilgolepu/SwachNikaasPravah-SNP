@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { useSimStore, simStore } from "@/lib/simStore";
 import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
 import { toast } from "sonner";
+import { simStore, useSimStore } from "@/lib/simStore";
 
 export const Route = createFileRoute("/dispatch")({
   head: () => ({
@@ -18,23 +18,67 @@ function DispatchPage() {
   const tickets = useSimStore((s) => s.tickets);
   const crews = useSimStore((s) => s.crews);
   const [selectedId, setSelectedId] = useState<string>(tickets[0]?.id);
-  const selected = tickets.find((t) => t.id === selectedId) ?? tickets[0];
-  const [selectedCrewName, setSelectedCrewName] = useState<string | null>(null);
+  const [selectedCrewId, setSelectedCrewId] = useState<string | null>(null);
   const [resolvingIds, setResolvingIds] = useState<string[]>([]);
+  const [purging, setPurging] = useState<string | null>(null);
+  const [escalationBanner, setEscalationBanner] = useState<string | null>(null);
+
+  const visibleTickets = tickets.filter(
+    (t) =>
+      (t.status !== "resolved" || resolvingIds.includes(t.id)) &&
+      (t.status !== "false_positive" || purging === t.id)
+  );
+
+  const selected = visibleTickets.find((t) => t.id === selectedId) ?? visibleTickets[0];
 
   // Auto-select the next ticket if the selected one is resolved/removed
   useEffect(() => {
-    const visible = tickets.filter((t) => t.status !== "resolved");
-    if (visible.length > 0 && !visible.some((t) => t.id === selectedId)) {
-      setSelectedId(visible[0].id);
+    if (visibleTickets.length > 0 && !visibleTickets.some((t) => t.id === selectedId)) {
+      setSelectedId(visibleTickets[0].id);
     }
-  }, [tickets, selectedId]);
+  }, [visibleTickets, selectedId]);
 
   const open = tickets.filter((t) => t.status === "open").length;
-  const active = tickets.filter((t) => t.status === "assigned" || t.status === "in_progress").length;
-  const resolved = tickets.filter((t) => t.status === "resolved").length;
+  const inField = tickets.filter((t) => t.status === "in_progress").length;
+  const resolved = tickets.filter((t) => t.status === "resolved" || t.status === "false_positive").length;
 
-  const visibleTickets = tickets.filter((t) => t.status !== "resolved" || resolvingIds.includes(t.id));
+  const handleDispatch = () => {
+    if (!selected) return;
+    const crew = (selectedCrewId ? crews.find((c) => c.id === selectedCrewId && c.available) : null)
+      ?? crews.find((c) => c.available);
+    if (!crew) {
+      toast.error("No available crews. Recall an engaged team first.");
+      return;
+    }
+    simStore.dispatchTicket(selected.id, crew.name);
+    setSelectedCrewId(null);
+    toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.", {
+      description: `${crew.name} · ETA ~${Math.round(crew.distanceKm * 4)}m`,
+    });
+  };
+
+  const handleFalsePositive = () => {
+    if (!selected) return;
+    const id = selected.id;
+    setPurging(id);
+    toast.message("Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.");
+    setTimeout(() => {
+      simStore.markFalsePositive(id);
+      setPurging(null);
+      const next = tickets.find((t) => t.id !== id && t.status !== "false_positive");
+      if (next) setSelectedId(next.id);
+    }, 420);
+  };
+
+  const handleEscalate = () => {
+    if (!selected) return;
+    simStore.escalateTicket(selected.id);
+    setEscalationBanner(selected.id);
+    toast.warning(`Ticket ${selected.id} escalated to Ward Engineer.`, {
+      description: "Sr. Engineer notification dispatched via priority channel.",
+    });
+    setTimeout(() => setEscalationBanner(null), 6000);
+  };
 
   return (
     <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
@@ -45,12 +89,23 @@ function DispatchPage() {
 
       <section className="grid grid-cols-3 gap-px bg-border border border-border mb-6">
         <StatTile label="Open" value={open.toString()} icon={<AlertTriangle className="h-4 w-4 text-risk-critical" />} />
-        <StatTile label="In Field" value={active.toString()} icon={<Users className="h-4 w-4 text-risk-warning" />} />
+        <StatTile label="In Field" value={inField.toString()} icon={<Users className="h-4 w-4 text-risk-warning" />} />
         <StatTile label="Resolved Today" value={resolved.toString()} icon={<CheckCircle2 className="h-4 w-4 text-risk-ok" />} />
       </section>
 
+      {escalationBanner && (
+        <div className="mb-6 border border-[#8B5CF6] bg-[#8B5CF6]/10 px-4 py-3 flex items-start justify-between">
+          <div>
+            <div className="text-[11px] mono uppercase tracking-widest text-[#C4B5FD]">Escalation Notice</div>
+            <div className="text-sm mt-1">
+              Ticket <span className="mono">{escalationBanner}</span> handed to Ward Engineer. Diagnostic packet attached.
+            </div>
+          </div>
+          <button onClick={() => setEscalationBanner(null)} className="text-[10px] mono uppercase tracking-widest text-muted-foreground hover:text-foreground">dismiss</button>
+        </div>
+      )}
+
       <section className="grid grid-cols-12 gap-6">
-        {/* Tickets list */}
         <div className="col-span-12 lg:col-span-5">
           <div className="bento" style={{ padding: 0 }}>
             <div className="px-5 py-4 border-b border-border">
@@ -60,17 +115,24 @@ function DispatchPage() {
               {visibleTickets.map((t) => {
                 const isSel = selected?.id === t.id;
                 const isResolving = resolvingIds.includes(t.id);
-                const isEscalated = t.status === "escalated";
+                const isEsc = t.status === "escalated";
+                const isPurging = purging === t.id;
                 return (
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`w-full text-left px-5 transition-all duration-500 ease-in-out transform origin-top overflow-hidden ${
-                      isResolving
-                        ? "max-h-0 opacity-0 scale-y-0 py-0 border-b-transparent pointer-events-none"
-                        : "max-h-[150px] opacity-100 scale-y-100 py-4 border-b border-border"
+                    style={{
+                      transition: "opacity 500ms ease, transform 500ms ease, max-height 500ms ease, padding 500ms ease",
+                      opacity: isPurging ? 0 : isResolving ? 0 : 1,
+                      transform: isPurging ? "translateX(40px)" : isResolving ? "scaleY(0)" : "none",
+                      maxHeight: isResolving ? "0px" : "150px",
+                      paddingTop: isResolving ? "0px" : "16px",
+                      paddingBottom: isResolving ? "0px" : "16px",
+                    }}
+                    className={`w-full text-left px-5 border-b border-border transition-all duration-500 ease-in-out transform origin-top overflow-hidden ${
+                      isResolving ? "py-0 border-b-transparent pointer-events-none" : ""
                     } ${
-                      isEscalated
+                      isEsc
                         ? isSel
                           ? "bg-purple-950/40 border-l-4 border-l-purple-500"
                           : "bg-purple-950/10 border-l-2 border-l-purple-700/50 hover:bg-purple-950/20"
@@ -92,7 +154,7 @@ function DispatchPage() {
                       </div>
                       <div className="text-right">
                         <div className={`mono text-xl font-semibold ${
-                          isEscalated ? "text-purple-400 font-bold" :
+                          isEsc ? "text-[#C4B5FD] font-bold" :
                           t.riskIndex >= 70 ? "text-risk-critical" : t.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
                         }`}>{t.riskIndex}</div>
                         <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
@@ -105,7 +167,6 @@ function DispatchPage() {
           </div>
         </div>
 
-        {/* Detail pane */}
         <div className="col-span-12 lg:col-span-7 space-y-6">
           {selected && (
             <>
@@ -132,26 +193,17 @@ function DispatchPage() {
                   <span className="mono text-[11px] text-muted-foreground">{selected.drainId}</span>
                 </div>
                 <div className="relative aspect-[16/8] bg-black overflow-hidden">
-                  <div className="absolute inset-0" style={{
-                    background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)",
-                  }} />
-                  <div className="absolute left-0 right-0 bottom-0 h-2/5" style={{
-                    background: "linear-gradient(180deg, rgba(40,60,90,0.7), rgba(10,20,40,0.95))",
-                  }} />
-                  <div className="absolute inset-x-10 bottom-10 h-14 border border-[#2a2a2a]" style={{
-                    backgroundImage: "repeating-linear-gradient(90deg, #1a1a1a 0 10px, #0a0a0a 10px 14px)",
-                  }} />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)" }} />
+                  <div className="absolute left-0 right-0 bottom-0 h-2/5" style={{ background: "linear-gradient(180deg, rgba(40,60,90,0.7), rgba(10,20,40,0.95))" }} />
+                  <div className="absolute inset-x-10 bottom-10 h-14 border border-[#2a2a2a]" style={{ backgroundImage: "repeating-linear-gradient(90deg, #1a1a1a 0 10px, #0a0a0a 10px 14px)" }} />
                   {[...Array(8)].map((_, i) => (
-                    <div key={i} className="absolute h-2 w-3" style={{
-                      left: `${15 + i * 9}%`, bottom: `${28 + (i % 3) * 4}%`,
-                      background: i % 2 ? "#a89656" : "#7a5a3a",
-                    }} />
+                    <div key={i} className="absolute h-2 w-3" style={{ left: `${15 + i * 9}%`, bottom: `${28 + (i % 3) * 4}%`, background: i % 2 ? "#a89656" : "#7a5a3a" }} />
                   ))}
                   <div className={`absolute border-2 ${selected.status === "escalated" ? "border-purple-500" : "border-risk-critical"}`} style={{ left: "22%", top: "50%", width: "35%", height: "35%" }}>
                     <span className={`absolute -top-5 left-0 text-[10px] mono px-1.5 text-white ${selected.status === "escalated" ? "bg-purple-600" : "bg-risk-critical"}`}>plastic 0.94</span>
                   </div>
                   <div className="absolute top-3 left-3 px-2 py-1 bg-black/70 border border-border">
-                    <span className="text-[10px] mono uppercase tracking-widest text-white">REC · CH-014</span>
+                    <span className="text-[10px] mono uppercase tracking-widest text-white">REC · {selected.drainId}</span>
                   </div>
                   <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/70 border border-border">
                     <span className="text-[10px] mono text-white">{selected.evidenceFrame}</span>
@@ -159,28 +211,28 @@ function DispatchPage() {
                 </div>
               </div>
 
-              {/* Crew assignment */}
               <div className="bento" style={{ padding: 0 }}>
-                <div className="px-5 py-4 border-b border-border">
+                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
                   <h3 className="text-[13px] font-semibold uppercase tracking-wider">Crew Assignment · Proximity Sort</h3>
+                  <span className="text-[10px] mono uppercase tracking-widest text-muted-foreground">
+                    {selectedCrewId ? `Selected: ${crews.find((c) => c.id === selectedCrewId)?.name}` : "Auto: closest available"}
+                  </span>
                 </div>
                 <div>
                   {crews.map((c) => {
-                    const isCrewSelected = selectedCrewName === c.name;
+                    const isPicked = selectedCrewId === c.id;
                     return (
                       <div
                         key={c.id}
-                        onClick={() => c.available && selected.status !== "resolved" && setSelectedCrewName(c.name)}
                         className={`px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
-                          c.available && selected.status !== "resolved" ? "cursor-pointer" : ""
+                          c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? "cursor-pointer" : ""
                         } ${
-                          isCrewSelected
-                            ? "bg-primary/10 border-l-2 border-l-primary"
-                            : "hover:bg-surface-2"
+                          isPicked ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
                         }`}
+                        onClick={() => c.available && selected.status !== "resolved" && selected.status !== "false_positive" && setSelectedCrewId(isPicked ? null : c.id)}
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`h-2 w-2 ${c.available ? "bg-risk-ok pulse-dot" : "bg-muted-foreground"}`} />
+                          <span className={`h-2 w-2 rounded-full ${c.available ? "bg-risk-ok pulse-dot" : "bg-risk-warning"}`} />
                           <div>
                             <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
                             <div className="text-[11px] text-muted-foreground mono mt-0.5">{c.members} safai karamcharis · {c.available ? "available" : "engaged"}</div>
@@ -192,16 +244,11 @@ function DispatchPage() {
                             <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
                           </div>
                           <button
-                            disabled={!c.available || selected.status === "resolved"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              simStore.dispatchCrew(selected.drainId, c.name);
-                              toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
-                              setSelectedCrewName(null);
-                            }}
-                            className="px-3 h-9 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[11px] font-semibold uppercase tracking-widest transition-colors disabled:opacity-40"
+                            disabled={!c.available || selected.status === "resolved" || selected.status === "false_positive"}
+                            onClick={(e) => { e.stopPropagation(); setSelectedCrewId(isPicked ? null : c.id); }}
+                            className="px-3 h-9 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[11px] font-semibold uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                            Assign
+                            {isPicked ? "Selected" : "Assign"}
                           </button>
                         </div>
                       </div>
@@ -210,44 +257,41 @@ function DispatchPage() {
                 </div>
               </div>
 
-              {/* Action bar */}
               <div className="grid grid-cols-3 gap-3">
                 <button
-                  disabled={selected.status === "assigned" || selected.status === "in_progress" || selected.status === "resolved"}
-                  onClick={() => {
-                    const availableCrews = crews.filter((c) => c.available);
-                    if (availableCrews.length > 0) {
-                      const defaultCrew = availableCrews[0];
-                      const crewToDispatch = selectedCrewName || (defaultCrew ? defaultCrew.name : "Crew Alpha");
-                      simStore.dispatchCrew(selected.drainId, crewToDispatch);
-                      toast.success("Routing coordinates and threshold analytics successfully transmitted to Field Crew.");
-                      setSelectedCrewName(null);
-                    }
-                  }}
-                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+                  onClick={handleDispatch}
+                  disabled={selected.status === "in_progress" || selected.status === "resolved" || selected.status === "false_positive"}
+                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Dispatch Crew <ArrowUpRight className="h-4 w-4" />
                 </button>
+                {selected.status === "in_progress" ? (
+                  <button
+                    disabled={selected.status === "resolved"}
+                    onClick={() => {
+                      setResolvingIds((prev) => [...prev, selected.id]);
+                      toast.success("Ticket resolved successfully. Site status updated to normal.");
+                      setTimeout(() => {
+                        simStore.resolveTicket(selected.id);
+                        setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
+                      }, 500);
+                    }}
+                    className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40"
+                  >
+                    Resolve Ticket
+                  </button>
+                ) : (
+                  <button
+                    disabled={selected.status === "resolved" || selected.status === "false_positive"}
+                    onClick={handleFalsePositive}
+                    className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40"
+                  >
+                    False Positive
+                  </button>
+                )}
                 <button
-                  disabled={selected.status === "resolved"}
-                  onClick={() => {
-                    setResolvingIds((prev) => [...prev, selected.id]);
-                    toast.success("Visual data logged. Frame forwarded to the training data pipeline for model retraining optimization.");
-                    setTimeout(() => {
-                      simStore.resolveTicket(selected.id);
-                      setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
-                    }, 500);
-                  }}
-                  className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground transition-colors disabled:opacity-40"
-                >
-                  False Positive / Resolve
-                </button>
-                <button
-                  disabled={selected.status === "resolved" || selected.status === "escalated"}
-                  onClick={() => {
-                    simStore.escalateTicket(selected.id);
-                    toast.info("Ticket escalated to Ward Engineer.");
-                  }}
+                  disabled={selected.status === "resolved" || selected.status === "false_positive" || selected.status === "escalated"}
+                  onClick={handleEscalate}
                   className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors disabled:opacity-40"
                 >
                   Escalate · Sr. Engineer
@@ -279,6 +323,7 @@ function StatusPill({ s }: { s: string }) {
     assigned: { c: "bg-risk-warning text-black", t: "ASSIGNED" },
     in_progress: { c: "bg-primary text-white", t: "IN FIELD" },
     resolved: { c: "bg-risk-ok text-black", t: "RESOLVED" },
+    false_positive: { c: "bg-muted text-muted-foreground", t: "FALSE POSITIVE" },
     escalated: { c: "bg-purple-600 text-white border border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)] animate-pulse", t: "ESCALATED TO WARD ENGINEER" },
   };
   const v = m[s] ?? m.open;
