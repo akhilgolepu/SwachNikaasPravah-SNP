@@ -1,60 +1,49 @@
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertFeed } from "@/components/AlertFeed";
-import { MapCanvas } from "@/components/MapCanvas";
+
+// Real GIS Map and Inspection Drawer
+const LazyLeafletMap = lazy(() => import("@/components/LeafletMap").then((m) => ({ default: m.LeafletMap })));
 import { InspectionDrawer } from "@/components/InspectionDrawer";
-import { useSimStore } from "@/lib/simStore";
+
+// New Refined Components
+import { RefinedKPIGrid } from "@/components/RefinedKPIGrid";
+import { RefinedAlertFeed } from "@/components/RefinedAlertFeed";
+import { RefinedMapContainer } from "@/components/RefinedMapContainer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ICCC Map Dashboard — DrainageAI" },
+      { title: "ICCC Map Dashboard — SwachNikaasPravah-SNP" },
       { name: "description", content: "Real-time GIS canvas plotting active drain risk across Hyderabad and Mumbai." },
     ],
   }),
   component: DashboardPage,
 });
 
-function DashboardPage() {
-  const drains = useSimStore((s) => s.drains);
-  const critical = drains.filter((d) => d.status === "critical").length;
-  const warning = drains.filter((d) => d.status === "warning").length;
-  const dispatched = drains.filter((d) => d.status === "dispatched").length;
-
+function ClientMap() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+  if (!isMounted) return <div className="flex-1 w-full h-full bg-slate-900 rounded-lg animate-pulse" />;
   return (
-    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
-      {/* Top KPI bento */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border border border-border mb-6">
-        <KPI label="Monitored Drains" value={drains.length.toString()} sub="across 2 cities" />
-        <KPI label="Critical Now" value={critical.toString()} sub="RI ≥ 70" accent="critical" />
-        <KPI label="Warning" value={warning.toString()} sub="45 ≤ RI < 70" accent="warning" />
-        <KPI label="Crews Dispatched" value={dispatched.toString()} sub="active tickets" accent="primary" />
-      </section>
-
-      {/* Split workspace */}
-      <section className="grid grid-cols-12 gap-6" style={{ height: "calc(100vh - 280px)", minHeight: 600 }}>
-        <div className="col-span-12 lg:col-span-4 min-h-0">
-          <AlertFeed />
-        </div>
-        <div className="col-span-12 lg:col-span-8 min-h-0">
-          <MapCanvas />
-        </div>
-      </section>
-
-      <InspectionDrawer />
-    </main>
+    <Suspense fallback={<div className="flex-1 w-full h-full bg-slate-900 rounded-lg animate-pulse" />}>
+      <LazyLeafletMap />
+    </Suspense>
   );
 }
 
-function KPI({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: "critical" | "warning" | "primary" }) {
-  const color =
-    accent === "critical" ? "text-risk-critical" :
-    accent === "warning" ? "text-risk-warning" :
-    accent === "primary" ? "text-primary" : "text-foreground";
+function DashboardPage() {
   return (
-    <div className="bg-card p-6">
-      <div className="text-[10px] mono uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className={`mono text-4xl font-semibold mt-3 ${color}`}>{value}</div>
-      <div className="text-[11px] text-muted-foreground mt-2">{sub}</div>
-    </div>
+    <main className="space-y-8 relative z-10">
+      <RefinedKPIGrid />
+
+      <div className="grid grid-cols-12 gap-8 h-[600px] relative z-10">
+        <RefinedAlertFeed />
+        
+        <RefinedMapContainer>
+          <ClientMap />
+          <InspectionDrawer />
+        </RefinedMapContainer>
+      </div>
+    </main>
   );
 }

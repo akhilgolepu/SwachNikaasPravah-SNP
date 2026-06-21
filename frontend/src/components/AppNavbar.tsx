@@ -14,7 +14,8 @@ export function AppNavbar() {
   const [open, setOpen] = useState(false);
   const [light, setLight] = useState(false);
   const storm = useSimStore((s) => s.stormMode);
-  const alertCount = useSimStore((s) => s.alerts.length);
+  const alerts = useSimStore((s) => s.alerts);
+  const wsStatus = useSimStore((s) => s.wsStatus);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", light);
@@ -55,12 +56,18 @@ export function AppNavbar() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Connection + alert status */}
             <div className="hidden sm:flex items-center gap-2 px-3 h-8 border border-border bg-card">
-              <span className={`h-1.5 w-1.5 ${storm ? "bg-risk-critical pulse-dot" : "bg-risk-ok"}`} />
+              <span className={`h-1.5 w-1.5 ${
+                storm ? "bg-risk-critical pulse-dot"
+                  : wsStatus === "connected" ? "bg-risk-ok"
+                  : wsStatus === "connecting" ? "bg-risk-warning pulse-dot"
+                  : "bg-risk-critical"
+              }`} />
               <span className="text-[11px] mono uppercase tracking-wider text-muted-foreground">
-                {storm ? "Flash Flood" : "Network Stable"}
+                {storm ? "Flash Flood" : wsStatus === "connected" ? "Live · WS" : wsStatus === "connecting" ? "Connecting" : "Offline"}
               </span>
-              <span className="text-[11px] mono text-foreground">· {alertCount} alerts</span>
+              <span className="text-[11px] mono text-foreground">· {alerts.length} alerts</span>
             </div>
             <button
               onClick={() => simStore.toggleStorm()}

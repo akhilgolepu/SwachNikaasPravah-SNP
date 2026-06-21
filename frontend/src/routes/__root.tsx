@@ -6,13 +6,14 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AppNavbar } from "@/components/AppNavbar";
+import { RefinedHeader } from "@/components/RefinedHeader";
+import { StormModeOverlay } from "@/components/StormModeOverlay";
 import { Toaster } from "@/components/ui/sonner";
-import { startSimulator } from "@/lib/simStore";
+import { simStore, useSimStore } from "@/lib/simStore";
 
 function NotFoundComponent() {
   return (
@@ -47,7 +48,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DrainageAI — ICCC Command Center" },
+      { title: "SwachNikaasPravah-SNP — ICCC Command Center" },
       { name: "description", content: "Real-time AI-powered drainage monitoring for Indian smart cities. Repurposing CCTV infrastructure to prevent urban flooding." },
     ],
     links: [
@@ -75,14 +76,29 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { startSimulator(); }, []);
+  const stormMode = useSimStore((s) => s.stormMode);
+
+  useEffect(() => {
+    // Initialize store — fetches data from backend API and connects WebSocket
+    simStore.initialize();
+  }, []);
+
+  const setStormMode = () => {
+    simStore.toggleStorm();
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background text-foreground">
-        <AppNavbar />
-        <Outlet />
+      <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+        <StormModeOverlay active={stormMode} />
+        
+        <div className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 py-6 font-sans text-white">
+          <RefinedHeader stormMode={stormMode} setStormMode={setStormMode} />
+          <Outlet />
+        </div>
         <Toaster theme="dark" position="bottom-right" />
       </div>
     </QueryClientProvider>
   );
 }
+export type ReactNode = import("react").ReactNode;

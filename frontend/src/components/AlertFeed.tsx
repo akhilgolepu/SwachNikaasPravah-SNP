@@ -1,18 +1,20 @@
 import { simStore, useSimStore } from "@/lib/simStore";
 import { ChevronRight } from "lucide-react";
-import type { Drain } from "@/lib/mockData";
+import type { Drain } from "@/lib/types";
 
 const statusStyle = (s: Drain["status"]) => {
   if (s === "critical") return { dot: "bg-risk-critical pulse-dot", label: "CRITICAL", text: "text-risk-critical", border: "border-risk-critical" };
   if (s === "warning") return { dot: "bg-risk-warning", label: "WARNING", text: "text-risk-warning", border: "border-risk-warning" };
   if (s === "dispatched") return { dot: "bg-primary", label: "DISPATCHED", text: "text-primary", border: "border-primary" };
+  if (s === "dismissed") return { dot: "bg-muted-foreground/40", label: "DISMISSED", text: "text-muted-foreground", border: "border-border" };
   return { dot: "bg-risk-ok", label: "NORMAL", text: "text-risk-ok", border: "border-risk-ok" };
 };
 
 export function AlertFeed() {
   const drains = useSimStore((s) => s.drains);
   const selected = useSimStore((s) => s.selectedDrainId);
-  const sorted = [...drains].sort((a, b) => b.riskIndex - a.riskIndex);
+  const loading = useSimStore((s) => s.loading);
+  const sorted = [...drains].sort((a, b) => b.risk_index - a.risk_index);
 
   return (
     <div className="flex flex-col h-full bg-card border border-border">
@@ -26,13 +28,18 @@ export function AlertFeed() {
         <span className="px-2 py-0.5 mono text-[10px] bg-background border border-border">RI ↓</span>
       </div>
       <div className="flex-1 overflow-y-auto">
+        {loading && (
+          <div className="px-5 py-8 text-center">
+            <div className="text-[11px] mono uppercase tracking-widest text-muted-foreground">Loading from backend...</div>
+          </div>
+        )}
         {sorted.map((d) => {
           const s = statusStyle(d.status);
           const isSel = selected === d.id;
           return (
             <button
               key={d.id}
-              onClick={() => simStore.focusDrain(d.id)}
+              onClick={() => simStore.selectDrain(d.id)}
               className={`group w-full text-left px-5 py-4 border-b border-border transition-colors ${
                 isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
               }`}
@@ -50,17 +57,17 @@ export function AlertFeed() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className={`mono text-2xl font-semibold leading-none ${s.text}`}>{d.riskIndex}</div>
+                  <div className={`mono text-2xl font-semibold leading-none ${s.text}`}>{d.risk_index}</div>
                   <div className="text-[9px] mono uppercase text-muted-foreground tracking-widest mt-1">RI</div>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <Metric label="Block" value={`${d.blockagePct}%`} />
-                <Metric label="Rain 6h" value={`${d.rainfallForecastMm}mm`} />
-                <Metric label="Topo" value={d.topoRisk.toFixed(2)} />
+                <Metric label="Block" value={`${d.blockage_pct}%`} />
+                <Metric label="Rain 6h" value={`${d.rainfall_forecast_mm}mm`} />
+                <Metric label="Topo" value={d.topo_risk.toFixed(2)} />
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] mono text-muted-foreground">{d.lastFrameAt} · {d.uptime}% uptime</span>
+                <span className="text-[10px] mono text-muted-foreground">{d.last_frame_at} · {d.uptime}% uptime</span>
                 <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
             </button>
