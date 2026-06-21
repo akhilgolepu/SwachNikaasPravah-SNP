@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 // Real GIS Map and Inspection Drawer
-import { LeafletMap } from "@/components/LeafletMap";
+const LazyLeafletMap = lazy(() => import("@/components/LeafletMap").then((m) => ({ default: m.LeafletMap })));
 import { InspectionDrawer } from "@/components/InspectionDrawer";
 
 // New Refined Components
@@ -20,6 +20,17 @@ export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
+function ClientMap() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+  if (!isMounted) return <div className="flex-1 w-full h-full bg-slate-900 rounded-lg animate-pulse" />;
+  return (
+    <Suspense fallback={<div className="flex-1 w-full h-full bg-slate-900 rounded-lg animate-pulse" />}>
+      <LazyLeafletMap />
+    </Suspense>
+  );
+}
+
 function DashboardPage() {
   return (
     <main className="space-y-8 relative z-10">
@@ -29,7 +40,7 @@ function DashboardPage() {
         <RefinedAlertFeed />
         
         <RefinedMapContainer>
-          <LeafletMap />
+          <ClientMap />
           <InspectionDrawer />
         </RefinedMapContainer>
       </div>
