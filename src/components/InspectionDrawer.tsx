@@ -40,6 +40,10 @@ export function InspectionDrawer() {
     setDispatching(false);
     setTimeout(close, 400);
   };
+  const handleDismiss = () => {
+    simStore.dismissDrain(drain.id);
+    setDispatching(false);
+  };
 
   return (
     <>
@@ -121,7 +125,10 @@ export function InspectionDrawer() {
               >
                 <Send className="h-4 w-4" /> Quick Dispatch
               </button>
-              <button className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground transition-colors">
+              <button
+                onClick={handleDismiss}
+                className="h-12 border border-border text-[11px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors"
+              >
                 Dismiss
               </button>
             </div>

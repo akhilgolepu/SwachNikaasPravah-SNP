@@ -1,100 +1,135 @@
-import { useEffect, useRef } from "react";
-import { useSimStore, simStore } from "@/lib/simStore";
+import { useEffect, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import { simStore, useSimStore } from "@/lib/simStore";
 import type { Drain } from "@/lib/mockData";
 
-const VIEW = { w: 1000, h: 600 };
-const BOUNDS = { minLat: 18.9, maxLat: 19.3, minLng: 72.7, maxLng: 78.6 };
-// Use two clusters: Mumbai-left, Hyderabad-right
-function project(d: Drain) {
-  // Map cities to halves of canvas to keep both visible
-  if (d.city === "Mumbai") {
-    const lat = (d.lat - 18.95) / (19.2 - 18.95);
-    const lng = (d.lng - 72.79) / (72.88 - 72.79);
-    return { x: 60 + lng * 360, y: 100 + (1 - lat) * 380 };
-  }
-  const lat = (d.lat - 17.39) / (17.50 - 17.39);
-  const lng = (d.lng - 78.34) / (78.50 - 78.34);
-  return { x: 560 + lng * 380, y: 100 + (1 - lat) * 380 };
+const INITIAL_CENTER: [number, number] = [18.5, 75.7]; // between Mumbai & Hyderabad
+const INITIAL_ZOOM = 6;
+
+const statusHex = (s: Drain["status"]) =>
+  s === "critical" ? "#FF3B3B" :
+  s === "warning" ? "#F5A524" :
+  s === "dispatched" ? "#0066FF" :
+  s === "dismissed" ? "#4A4A4A" : "#17C964";
+
+function buildIcon(d: Drain, isSelected: boolean): L.DivIcon {
+  const color = statusHex(d.status);
+  const pulse = d.status === "critical"
+    ? `<span class="absolute inset-0 rounded-full" style="background:${color};opacity:.35;animation:pulse-critical 1.6s ease-out infinite;border-radius:9999px;"></span>`
+    : "";
+  const ring = isSelected ? `box-shadow:0 0 0 2px #0066FF, 0 0 0 4px rgba(0,102,255,.25);` : "box-shadow:0 0 0 2px #0A0A0A;";
+  const html = `
+    <div style="position:relative;width:18px;height:18px;">
+      ${pulse}
+      <span style="position:absolute;inset:4px;background:${color};${ring};border-radius:9999px;"></span>
+    </div>
+  `;
+  return L.divIcon({
+    className: "drainage-marker",
+    html,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
 }
 
-const statusColor = (s: Drain["status"]) =>
-  s === "critical" ? "var(--color-risk-critical)" :
-  s === "warning" ? "var(--color-risk-warning)" :
-  s === "dispatched" ? "var(--color-primary)" : "var(--color-risk-ok)";
+function FocusController() {
+  const map = useMap();
+  const focus = useSimStore((s) => s.focus);
+  const lastToken = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focus || focus.token === lastToken.current) return;
+    lastToken.current = focus.token;
+    // cinematic: zoom out slightly then fly in close
+    const current = map.getZoom();
+    const intermediate = Math.max(5, Math.min(current, 7));
+    map.flyTo(map.getCenter(), intermediate, { duration: 0.5, easeLinearity: 0.25 });
+    window.setTimeout(() => {
+      map.flyTo([focus.lat, focus.lng], 16, { duration: 1.4, easeLinearity: 0.2 });
+    }, 520);
+  }, [focus, map]);
+  return null;
+}
+
+function FitOnMount({ drains }: { drains: Drain[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!drains.length) return;
+    const bounds = L.latLngBounds(drains.map((d) => [d.lat, d.lng] as [number, number]));
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 7 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
 
 export function MapCanvas() {
   const drains = useSimStore((s) => s.drains);
   const selected = useSimStore((s) => s.selectedDrainId);
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  // tick to animate pulse
-  useEffect(() => {
-    const i = setInterval(() => svgRef.current?.classList.toggle("opacity-100"), 1000);
-    return () => clearInterval(i);
-  }, []);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <div className="relative w-full h-full bg-[#0A0A0A] overflow-hidden border border-border">
-      {/* faux dark map grid */}
-      <div className="absolute inset-0 grid-bg opacity-40" />
-      <div className="absolute inset-0 bg-gradient-radial" style={{
-        background: "radial-gradient(circle at 30% 40%, rgba(0,102,255,0.06), transparent 50%), radial-gradient(circle at 75% 60%, rgba(23,201,100,0.04), transparent 50%)",
-      }} />
+      {mounted ? (
+        <MapContainer
+          center={INITIAL_CENTER}
+          zoom={INITIAL_ZOOM}
+          minZoom={4}
+          maxZoom={18}
+          zoomControl={false}
+          attributionControl={false}
+          worldCopyJump
+          preferCanvas
+          style={{ width: "100%", height: "100%", background: "#0A0A0A" }}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            subdomains={["a", "b", "c", "d"]}
+            maxZoom={20}
+          />
+          <FitOnMount drains={drains} />
+          <FocusController />
+          {drains.map((d) => (
+            <Marker
+              key={d.id}
+              position={[d.lat, d.lng]}
+              icon={buildIcon(d, selected === d.id)}
+              eventHandlers={{ click: () => simStore.focusDrain(d.id) }}
+            >
+              <Popup className="drainage-popup">
+                <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}>
+                  <div style={{ opacity: 0.7 }}>{d.id}</div>
+                  <div style={{ fontWeight: 600, marginTop: 2 }}>{d.name}</div>
+                  <div style={{ opacity: 0.7, marginTop: 2 }}>{d.ward} · {d.city}</div>
+                  <div style={{ marginTop: 6 }}>RI <b style={{ color: statusHex(d.status) }}>{d.riskIndex}</b></div>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      ) : (
+        <div className="absolute inset-0 grid place-items-center text-[10px] mono uppercase tracking-widest text-muted-foreground">
+          Initializing GIS tile layer…
+        </div>
+      )}
 
-      <svg ref={svgRef} viewBox={`0 0 ${VIEW.w} ${VIEW.h}`} className="absolute inset-0 w-full h-full">
-        {/* coastline / road squiggles */}
-        <g stroke="#1F1F1F" strokeWidth="1" fill="none">
-          <path d="M0,380 Q120,360 240,400 T480,380 T720,420 T1000,400" />
-          <path d="M0,200 Q200,220 400,180 T800,220 T1000,200" opacity="0.5" />
-          <path d="M120,0 L120,600" opacity="0.3" />
-          <path d="M560,0 L560,600" opacity="0.5" strokeDasharray="4 6" />
-        </g>
-        {/* City labels */}
-        <text x="180" y="80" fill="#8F8F8F" fontSize="11" letterSpacing="3" className="mono">MUMBAI</text>
-        <text x="720" y="80" fill="#8F8F8F" fontSize="11" letterSpacing="3" className="mono">HYDERABAD</text>
-
-        {drains.map((d) => {
-          const { x, y } = project(d);
-          const isSel = selected === d.id;
-          const color = statusColor(d.status);
-          return (
-            <g key={d.id} className="cursor-pointer" onClick={() => simStore.selectDrain(d.id)}>
-              {d.status === "critical" && (
-                <circle cx={x} cy={y} r="18" fill={color} opacity="0.15">
-                  <animate attributeName="r" values="10;24;10" dur="1.6s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.3;0;0.3" dur="1.6s" repeatCount="indefinite" />
-                </circle>
-              )}
-              <circle cx={x} cy={y} r="6" fill={color} stroke="#0A0A0A" strokeWidth="2" />
-              {isSel && (
-                <>
-                  <rect x={x - 12} y={y - 12} width="24" height="24" fill="none" stroke={color} strokeWidth="1" />
-                  <text x={x + 16} y={y - 8} fill="#FFFFFF" fontSize="10" className="mono">{d.id}</text>
-                  <text x={x + 16} y={y + 6} fill="#8F8F8F" fontSize="9" className="mono">RI {d.riskIndex}</text>
-                </>
-              )}
-            </g>
-          );
-        })}
-      </svg>
-
-      {/* legend */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-card border border-border">
+      <div className="absolute z-[500] bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-card border border-border">
         {[
-          ["critical", "var(--color-risk-critical)", "Critical"],
-          ["warning", "var(--color-risk-warning)", "Warning"],
-          ["ok", "var(--color-risk-ok)", "Normal"],
-          ["dispatched", "var(--color-primary)", "Dispatched"],
+          ["critical", "#FF3B3B", "Critical"],
+          ["warning", "#F5A524", "Warning"],
+          ["ok", "#17C964", "Normal"],
+          ["dispatched", "#0066FF", "Dispatched"],
+          ["dismissed", "#4A4A4A", "Dismissed"],
         ].map(([k, c, l]) => (
           <div key={k} className="flex items-center gap-1.5">
-            <span className="h-2 w-2" style={{ background: c }} />
+            <span className="h-2 w-2 rounded-full" style={{ background: c }} />
             <span className="text-[10px] uppercase tracking-wider mono text-muted-foreground">{l}</span>
           </div>
         ))}
       </div>
 
-      <div className="absolute top-4 right-4 px-3 py-1.5 bg-card border border-border">
-        <span className="text-[10px] mono uppercase tracking-wider text-muted-foreground">Live · WebSocket</span>
+      <div className="absolute z-[500] top-4 right-4 px-3 py-1.5 bg-card border border-border">
+        <span className="text-[10px] mono uppercase tracking-wider text-muted-foreground">Live · CARTO Dark Matter</span>
       </div>
     </div>
   );

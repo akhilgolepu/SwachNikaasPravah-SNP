@@ -1,4 +1,4 @@
-export type RiskStatus = "critical" | "warning" | "ok" | "dispatched";
+export type RiskStatus = "critical" | "warning" | "ok" | "dispatched" | "dismissed";
 
 export interface Drain {
   id: string;
@@ -8,15 +8,17 @@ export interface Drain {
   lat: number;
   lng: number;
   type: "Stormwater" | "Combined" | "Box Culvert";
-  blockagePct: number; // A_b
-  rainfallForecastMm: number; // R_f (6h)
-  topoRisk: number; // V_t (0-1)
-  riskIndex: number; // RI 0-100
+  blockagePct: number;
+  rainfallForecastMm: number;
+  topoRisk: number;
+  riskIndex: number;
   status: RiskStatus;
-  uptime: number; // %
+  uptime: number;
   lastFrameAt: string;
-  detected: string[]; // e.g. ["plastic","silt"]
+  detected: string[];
 }
+
+export type TicketStatus = "open" | "assigned" | "in_progress" | "resolved" | "false_positive" | "escalated";
 
 export interface Ticket {
   id: string;
@@ -25,7 +27,7 @@ export interface Ticket {
   ward: string;
   riskIndex: number;
   createdAt: string;
-  status: "open" | "assigned" | "in_progress" | "resolved";
+  status: TicketStatus;
   crew?: string;
   etaMin?: number;
   evidenceFrame: string;
@@ -40,7 +42,6 @@ export interface Crew {
   members: number;
 }
 
-// Hyderabad + Mumbai coordinate spread
 const seed: Omit<Drain, "riskIndex" | "status">[] = [
   { id: "HYD-GCB-014", name: "Gachibowli Jn. Main Outfall", ward: "Gachibowli", city: "Hyderabad", lat: 17.4401, lng: 78.3489, type: "Stormwater", blockagePct: 78, rainfallForecastMm: 45, topoRisk: 0.82, uptime: 99.4, lastFrameAt: "2s ago", detected: ["plastic", "silt"] },
   { id: "HYD-KKD-007", name: "Kukatpally Y-Junction", ward: "Kukatpally", city: "Hyderabad", lat: 17.4849, lng: 78.4138, type: "Combined", blockagePct: 62, rainfallForecastMm: 38, topoRisk: 0.71, uptime: 98.1, lastFrameAt: "1s ago", detected: ["plastic"] },
@@ -57,7 +58,6 @@ const seed: Omit<Drain, "riskIndex" | "status">[] = [
 ];
 
 export function computeRI(d: Pick<Drain, "blockagePct" | "rainfallForecastMm" | "topoRisk">): number {
-  // RI = 0.5*Ab + 0.3*min(Rf/70,1)*100 + 0.2*Vt*100
   const rfNorm = Math.min(d.rainfallForecastMm / 70, 1) * 100;
   return Math.round(0.5 * d.blockagePct + 0.3 * rfNorm + 0.2 * d.topoRisk * 100);
 }
@@ -73,13 +73,16 @@ export const initialDrains: Drain[] = seed.map((d) => {
   return { ...d, riskIndex: ri, status: riStatus(ri) };
 });
 
-export const crews: Crew[] = [
+export const initialCrews: Crew[] = [
   { id: "C-01", name: "Crew Alpha", lead: "R. Subramanyam", distanceKm: 1.2, available: true, members: 4 },
   { id: "C-02", name: "Crew Bravo", lead: "K. Lakshmi", distanceKm: 2.7, available: true, members: 5 },
   { id: "C-03", name: "Crew Charlie", lead: "M. Ibrahim", distanceKm: 3.4, available: false, members: 3 },
   { id: "C-04", name: "Crew Delta", lead: "S. Venkatesh", distanceKm: 4.9, available: true, members: 4 },
   { id: "C-05", name: "Crew Echo", lead: "A. Pradeep", distanceKm: 6.1, available: true, members: 6 },
 ];
+
+// Backwards-compat export (read-only snapshot)
+export const crews: Crew[] = initialCrews;
 
 export const initialTickets: Ticket[] = [
   { id: "TKT-2418", drainId: "HYD-MDP-003", drainName: "Madhapur HITEC Underpass", ward: "Madhapur", riskIndex: computeRI(seed[3]), createdAt: "4 min ago", status: "open", evidenceFrame: "2025-06-20 14:32:08 IST" },
