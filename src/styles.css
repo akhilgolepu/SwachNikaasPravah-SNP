@@ -45,6 +45,23 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+
+  --color-glass: rgba(255, 255, 255, 0.03);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  
+  --color-brand-primary: #0066FF;
+  --color-brand-cyan: #00F2FF;
+  --color-brand-purple: #7000FF;
+  
+  --color-status-critical: #FF3B3B;
+  --color-status-warning: #F5A524;
+  --color-status-ok: #17C964;
+
+  /* Custom Gradients */
+  --bg-mesh: radial-gradient(at 0% 0%, rgba(0, 102, 255, 0.15) 0px, transparent 50%),
+             radial-gradient(at 100% 0%, rgba(112, 0, 255, 0.1) 0px, transparent 50%),
+             radial-gradient(at 100% 100%, rgba(0, 242, 255, 0.1) 0px, transparent 50%),
+             radial-gradient(at 0% 100%, rgba(255, 59, 59, 0.05) 0px, transparent 50%);
 }
 
 /* Dark is default per spec */
@@ -184,3 +201,146 @@
 @utility slide-in-right {
   animation: slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* --- Fluid Intelligence X: Custom Animations & Utilities --- */
+
+@utility frosted-glass {
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Kinetic Gradient Flow */
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@utility kinetic-gradient {
+  background: linear-gradient(270deg, var(--color-background), var(--color-surface-2), var(--color-background));
+  background-size: 200% 200%;
+  animation: gradientFlow 8s ease infinite;
+}
+
+/* Quantum Auras */
+@keyframes pulseAuraCritical {
+  0%, 100% { box-shadow: 0 0 15px 2px rgba(255, 59, 59, 0.4); }
+  50% { box-shadow: 0 0 30px 5px rgba(255, 100, 50, 0.8); }
+}
+
+@utility quantum-aura-critical {
+  animation: pulseAuraCritical 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseAuraWarning {
+  0%, 100% { box-shadow: 0 0 15px 2px rgba(245, 165, 36, 0.4); }
+  50% { box-shadow: 0 0 30px 5px rgba(245, 165, 36, 0.8); }
+}
+
+@utility quantum-aura-warning {
+  animation: pulseAuraWarning 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseAuraPrimary {
+  0%, 100% { box-shadow: 0 0 15px 2px rgba(0, 102, 255, 0.4); }
+  50% { box-shadow: 0 0 30px 5px rgba(0, 150, 255, 0.8); }
+}
+
+@utility quantum-aura-primary {
+  animation: pulseAuraPrimary 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* --- DrainageAI v2.0 Redesign Utilities & Animations --- */
+
+@utility glass-card {
+  background: var(--color-glass);
+  backdrop-filter: blur(40px);
+  border: 1px solid var(--color-glass-border);
+  border-radius: 24px; /* Using large rounded corners */
+  transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 40px -10px rgba(0, 102, 255, 0.3);
+  transform: translateY(-4px);
+}
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes rotate-gradient {
+  to { --angle: 360deg; }
+}
+
+@utility focused-gradient-border {
+  position: relative;
+  border: 1px solid transparent;
+  background: linear-gradient(var(--color-glass), var(--color-glass)) padding-box,
+              conic-gradient(from var(--angle), var(--color-brand-primary), var(--color-brand-cyan), var(--color-brand-purple), var(--color-brand-primary)) border-box;
+  animation: rotate-gradient 4s linear infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@utility animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.05; }
+  50% { transform: scale(1.2); opacity: 0.1; }
+}
+
+@utility animate-breathe {
+  animation: breathe 6s ease-in-out infinite;
+}
+
+@keyframes glitch {
+  0% { transform: skewX(0deg); opacity: 1; }
+  25% { transform: skewX(-5deg); opacity: 0.8; }
+  50% { transform: skewX(5deg); opacity: 1; }
+  75% { transform: skewX(-2deg); opacity: 0.9; }
+  100% { transform: skewX(0deg); opacity: 1; }
+}
+
+@utility animate-glitch {
+  animation: glitch 0.2s ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+@utility animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 200%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@utility glow-text {
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+@utility kpi-glow {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.2;
+  top: -20px;
+  right: -20px;
+  pointer-events: none;
+}
+
