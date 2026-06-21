@@ -270,6 +270,10 @@ export const simStore = {
   },
 };
 
+if (typeof window !== "undefined") {
+  (window as any).simStore = simStore;
+}
+
 export function useSimStore<T>(selector: (s: State) => T): T {
   return useSyncExternalStore(simStore.subscribe, () => selector(simStore.getState()), () => selector(state));
 }
