@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { Camera, CheckCircle2, AlertTriangle, ArrowUpRight, Users } from "lucide-react";
 import { toast } from "sonner";
-import { getInferenceFrameURL } from "@/lib/api";
+import { getInferenceStreamURL } from "@/lib/api";
 import { simStore, useSimStore } from "@/lib/simStore";
 import { motion } from "framer-motion";
 
@@ -209,31 +209,34 @@ function DispatchPage() {
                   <span className="mono text-[11px] text-[#0066FF] font-bold bg-[#0066FF]/10 px-2 py-1 rounded-md">{selected.drain_id}</span>
                 </div>
                 <div className="relative aspect-[16/8] bg-black overflow-hidden">
-                  {/* Real backend served frame */}
-                  <img
-                    src={getInferenceFrameURL(selected.drain_id)}
-                    alt={`Evidence frame — ${selected.drain_id}`}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                  {/* Fallback gradient */}
-                  <div className="absolute inset-0 pointer-events-none" style={{
+                  {/* Fallback gradient — z-0 so video sits above it */}
+                  <div className="absolute inset-0 z-0 pointer-events-none" style={{
                     background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)",
                   }} />
-                  <div className="absolute left-0 right-0 bottom-0 h-2/5 pointer-events-none" style={{
+                  <div className="absolute left-0 right-0 bottom-0 h-2/5 z-0 pointer-events-none" style={{
                     background: "linear-gradient(180deg, rgba(40,60,90,0.7), rgba(10,20,40,0.95))",
                   }} />
-                  <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10 z-10">
+
+                  {/* MJPEG stream — continuous YOLO-annotated video */}
+                  <img
+                    src={getInferenceStreamURL(selected.drain_id)}
+                    alt={`Evidence stream — ${selected.drain_id}`}
+                    className="absolute inset-0 w-full h-full object-cover z-[1]"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+
+                  {/* HUD overlays */}
+                  <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10 z-[5]">
                     <span className="text-[10px] mono uppercase tracking-widest text-white flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B3B] animate-pulse"></span> REC · {selected.drain_id}
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B3B] animate-pulse"></span> LIVE · {selected.drain_id}
                     </span>
                   </div>
-                  <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10 z-10">
+                  <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10 z-[5]">
                     <span className="text-[10px] mono text-white">{selected.evidence_frame}</span>
                   </div>
                   
                   {/* Scanner overlay effect on hover */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity pointer-events-none z-10" style={{ backgroundImage: 'linear-gradient(rgba(0, 242, 255, 0.2) 1px, transparent 1px)', backgroundSize: '100% 4px' }} />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity pointer-events-none z-[2]" style={{ backgroundImage: 'linear-gradient(rgba(0, 242, 255, 0.2) 1px, transparent 1px)', backgroundSize: '100% 4px' }} />
                 </div>
               </div>
 

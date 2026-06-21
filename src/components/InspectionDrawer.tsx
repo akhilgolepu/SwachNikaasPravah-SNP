@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { simStore, useSimStore } from "@/lib/simStore";
-import { getInferenceFrameURL, getRawFrameURL } from "@/lib/api";
-import { X, RefreshCw, Send, AlertTriangle } from "lucide-react";
+import { getInferenceStreamURL, getRawStreamURL, getInferenceFrameURL } from "@/lib/api";
+import { X, RefreshCw, Send, AlertTriangle, Camera } from "lucide-react";
 
 function useTickingTimestamp() {
   const [now, setNow] = useState(() => new Date());
@@ -93,10 +93,15 @@ export function InspectionDrawer() {
 
         {/* Split viewport — real backend frames */}
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-2 gap-3">
-            <StreamPanel label="RAW RTSP" drain={activeDrain} mode="raw" channel={1} />
-            <StreamPanel label="YOLO INFERENCE" drain={activeDrain} mode="yolo" channel={2} />
-          </div>
+          <section>
+            <h4 className="text-[13px] font-semibold uppercase tracking-wider flex items-center gap-2 mb-3">
+              <Camera className="h-3.5 w-3.5 text-brand-cyan" /> Visual Evidence Vault
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <StreamPanel label="RAW RTSP" drain={activeDrain} mode="raw" channel={1} />
+              <StreamPanel label="YOLO INFERENCE" drain={activeDrain} mode="yolo" channel={2} />
+            </div>
+          </section>
 
           {/* Risk Index Math */}
           <section>
@@ -200,56 +205,53 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 function StreamPanel({ label, drain, mode, channel }: { label: string; drain: { id: string; ward: string; blockage_pct: number }; mode: "raw" | "yolo"; channel: number }) {
   const ts = useTickingTimestamp();
   const channelId = nvrChannelId(drain, channel);
-  const [frameKey, setFrameKey] = useState(0);
+  const [imgVisible, setImgVisible] = useState(true);
 
-  // Get frame URL from the backend inference API
-  const frameUrl = mode === "yolo"
-    ? getInferenceFrameURL(drain.id)
-    : getRawFrameURL(drain.id);
+  // MJPEG stream URL — browser <img> natively supports multipart/x-mixed-replace
+  const streamUrl = mode === "yolo"
+    ? getInferenceStreamURL(drain.id)
+    : getRawStreamURL(drain.id);
 
-  // Auto-refresh frame every 5 seconds
+  // Reset visibility when drain changes
   useEffect(() => {
-    const interval = setInterval(() => setFrameKey((k) => k + 1), 5000);
-    return () => clearInterval(interval);
-  }, []);
+    setImgVisible(true);
+  }, [drain.id]);
 
   return (
     <div className="relative aspect-video bg-black border border-border overflow-hidden">
-      {/* Backend-served frame (real JPEG from YOLO inference) */}
-      <img
-        key={frameKey}
-        src={`${frameUrl}&k=${frameKey}`}
-        alt={`${label} — ${drain.id}`}
-        className="absolute inset-0 w-full h-full object-cover"
-        onError={(e) => {
-          // Fallback to CSS gradient if backend isn't running
-          (e.target as HTMLImageElement).style.display = "none";
-        }}
-      />
-
-      {/* Fallback background (shown if img fails to load) */}
-      <div className="absolute inset-0" style={{
+      {/* Fallback background (shown if stream fails to load) */}
+      <div className="absolute inset-0 z-0" style={{
         background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)",
       }} />
+
+      {/* Backend MJPEG stream — continuously updates via multipart/x-mixed-replace */}
+      {imgVisible && (
+        <img
+          src={streamUrl}
+          alt={`${label} — ${drain.id}`}
+          className="absolute inset-0 w-full h-full object-cover z-[1]"
+          onError={() => setImgVisible(false)}
+        />
+      )}
 
       {/* CCTV scanlines */}
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-40"
+        className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-40 z-[2]"
         style={{
           backgroundImage:
               "repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
         }}
       />
       {/* Moving scan line */}
-      <div className="absolute inset-x-0 h-px bg-primary/60 scan-line" />
+      <div className="absolute inset-x-0 h-px bg-primary/60 scan-line z-[2]" />
 
       {/* HUD — top */}
-      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2">
+      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-[3]">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-black/70 border border-white/10">
             <span className="h-1.5 w-1.5 bg-risk-critical pulse-dot" />
-            <span className="text-[9px] mono uppercase tracking-widest text-white">REC</span>
+            <span className="text-[9px] mono uppercase tracking-widest text-white">LIVE</span>
             <span className="text-[9px] mono uppercase tracking-widest text-white/80">· {label}</span>
           </div>
           <div className="px-1.5 py-0.5 bg-black/70 border border-white/10">
@@ -264,19 +266,12 @@ function StreamPanel({ label, drain, mode, channel }: { label: string; drain: { 
               <span className="text-white/60">.{ts.ms}</span>
             </div>
           </div>
-          <button
-            onClick={() => setFrameKey((k) => k + 1)}
-            className="h-5 w-5 grid place-items-center bg-black/70 border border-white/10 hover:bg-primary/30"
-            title="Refresh frame"
-          >
-            <RefreshCw className="h-2.5 w-2.5 text-white" />
-          </button>
         </div>
       </div>
 
       {/* HUD — bottom */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-        <span className="text-[9px] mono text-white/70">{drain.id} · 1920×1080 · 24fps · H.264</span>
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-[3]">
+        <span className="text-[9px] mono text-white/70">{drain.id} · 640×480 · 10fps · MJPEG</span>
         <span className="text-[9px] mono text-white/70 uppercase tracking-widest">{mode === "yolo" ? "AI: YOLOv8-DRAIN" : "AI: OFF"}</span>
       </div>
     </div>

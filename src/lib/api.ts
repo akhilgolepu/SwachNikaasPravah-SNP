@@ -59,5 +59,12 @@ export const getInferenceFrameURL = (drainId: string) =>
 export const getRawFrameURL = (drainId: string) =>
   `${BASE}/api/v1/inference/${drainId}/raw-frame?t=${Date.now()}`;
 
+// MJPEG continuous streams — no cache-busting needed (persistent connection)
+export const getInferenceStreamURL = (drainId: string) =>
+  `${BASE}/api/v1/inference/${drainId}/stream`;
+
+export const getRawStreamURL = (drainId: string) =>
+  `${BASE}/api/v1/inference/${drainId}/raw-stream`;
+
 // ── Health ──────────────────────────────────────────────────────────────────
 export const healthCheck = () => json<{ status: string }>("/api/v1/health");
