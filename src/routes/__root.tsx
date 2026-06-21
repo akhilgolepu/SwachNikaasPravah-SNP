@@ -11,7 +11,6 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppNavbar } from "@/components/AppNavbar";
-import { InspectionDrawer } from "@/components/InspectionDrawer";
 import { Toaster } from "@/components/ui/sonner";
 import { startSimulator } from "@/lib/simStore";
 
@@ -82,7 +81,6 @@ function RootComponent() {
       <div className="min-h-screen bg-background text-foreground">
         <AppNavbar />
         <Outlet />
-        <InspectionDrawer />
         <Toaster theme="dark" position="bottom-right" />
       </div>
     </QueryClientProvider>

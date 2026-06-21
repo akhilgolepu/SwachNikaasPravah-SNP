@@ -32,35 +32,57 @@ export function InspectionDrawer() {
   const crews = useSimStore((s) => s.crews);
   const [dispatching, setDispatching] = useState(false);
 
-  if (!selectedId || !drain) return null;
+  // Keep a local copy of the drain so that when it is closed, the data is still rendered during the slide-out transition.
+  const [activeDrain, setActiveDrain] = useState<typeof drain>(null);
+
+  useEffect(() => {
+    if (drain) {
+      setActiveDrain(drain);
+    }
+  }, [drain]);
+
+  const isOpen = !!selectedId && !!drain;
+
+  if (!activeDrain) return null;
 
   const close = () => { simStore.selectDrain(null); setDispatching(false); };
   const handleDispatch = (crewName: string) => {
-    simStore.dispatchCrew(drain.id, crewName);
+    if (!activeDrain) return;
+    simStore.dispatchCrew(activeDrain.id, crewName);
     setDispatching(false);
     setTimeout(close, 400);
   };
   const handleDismiss = () => {
-    simStore.dismissDrain(drain.id);
+    if (!activeDrain) return;
+    simStore.dismissDrain(activeDrain.id);
     setDispatching(false);
   };
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={close} />
-      <aside className="fixed right-0 top-16 bottom-0 w-full sm:w-[520px] bg-background border-l border-border z-40 slide-in-right overflow-y-auto">
+      <div 
+        className={`absolute inset-0 bg-black/50 z-30 transition-opacity duration-300 ${
+          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`} 
+        onClick={close} 
+      />
+      <aside 
+        className={`absolute right-0 top-0 bottom-0 w-full sm:w-[520px] bg-background border-l border-border z-40 transition-transform duration-300 ease-in-out overflow-y-auto ${
+          isOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
         <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] mono uppercase tracking-widest text-muted-foreground">{drain.id}</span>
+              <span className="text-[10px] mono uppercase tracking-widest text-muted-foreground">{activeDrain.id}</span>
               <span className={`text-[10px] mono uppercase tracking-widest px-1.5 py-0.5 ${
-                drain.status === "critical" ? "bg-risk-critical text-white" :
-                drain.status === "warning" ? "bg-risk-warning text-black" :
-                drain.status === "dispatched" ? "bg-primary text-white" : "bg-risk-ok text-black"
-              }`}>{drain.status}</span>
+                activeDrain.status === "critical" ? "bg-risk-critical text-white" :
+                activeDrain.status === "warning" ? "bg-risk-warning text-black" :
+                activeDrain.status === "dispatched" ? "bg-primary text-white" : "bg-risk-ok text-black"
+              }`}>{activeDrain.status}</span>
             </div>
-            <h3 className="text-base font-semibold mt-1">{drain.name}</h3>
-            <p className="text-[11px] text-muted-foreground">{drain.ward} · {drain.city} · {drain.type}</p>
+            <h3 className="text-base font-semibold mt-1">{activeDrain.name}</h3>
+            <p className="text-[11px] text-muted-foreground">{activeDrain.ward} · {activeDrain.city} · {activeDrain.type}</p>
           </div>
           <button onClick={close} className="h-8 w-8 grid place-items-center border border-border hover:bg-surface-2">
             <X className="h-4 w-4" />
@@ -70,8 +92,8 @@ export function InspectionDrawer() {
         {/* Split viewport */}
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-2 gap-3">
-            <StreamPanel label="RAW RTSP" drain={drain} mode="raw" channel={1} />
-            <StreamPanel label="YOLO INFERENCE" drain={drain} mode="yolo" channel={2} />
+            <StreamPanel label="RAW RTSP" drain={activeDrain} mode="raw" channel={1} />
+            <StreamPanel label="YOLO INFERENCE" drain={activeDrain} mode="yolo" channel={2} />
           </div>
 
           {/* Risk Index Math */}
@@ -80,18 +102,18 @@ export function InspectionDrawer() {
               Risk Index Fusion — RI = 0.5·A<sub>b</sub> + 0.3·R<sub>f</sub> + 0.2·V<sub>t</sub>
             </h4>
             <div className="grid grid-cols-3 gap-3">
-              <Stat label="A_b · Blockage" value={`${drain.blockagePct}%`} accent={drain.blockagePct >= 70} />
-              <Stat label="R_f · Rain 6h" value={`${drain.rainfallForecastMm} mm`} accent={drain.rainfallForecastMm >= 50} />
-              <Stat label="V_t · Topo" value={drain.topoRisk.toFixed(2)} accent={drain.topoRisk >= 0.7} />
+              <Stat label="A_b · Blockage" value={`${activeDrain.blockagePct}%`} accent={activeDrain.blockagePct >= 70} />
+              <Stat label="R_f · Rain 6h" value={`${activeDrain.rainfallForecastMm} mm`} accent={activeDrain.rainfallForecastMm >= 50} />
+              <Stat label="V_t · Topo" value={activeDrain.topoRisk.toFixed(2)} accent={activeDrain.topoRisk >= 0.7} />
             </div>
             <div className="mt-3 bento-lg flex items-center justify-between" style={{ padding: 20 }}>
               <div>
                 <div className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Computed Risk Index</div>
                 <div className={`mono text-4xl font-semibold mt-1 ${
-                  drain.riskIndex >= 70 ? "text-risk-critical" : drain.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
-                }`}>{drain.riskIndex}<span className="text-base text-muted-foreground">/100</span></div>
+                  activeDrain.riskIndex >= 70 ? "text-risk-critical" : activeDrain.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
+                }`}>{activeDrain.riskIndex}<span className="text-base text-muted-foreground">/100</span></div>
               </div>
-              {drain.riskIndex >= 70 && (
+              {activeDrain.riskIndex >= 70 && (
                 <div className="flex items-center gap-2 text-risk-critical">
                   <AlertTriangle className="h-4 w-4" />
                   <span className="text-[11px] mono uppercase tracking-widest">Critical Threshold</span>
@@ -104,13 +126,13 @@ export function InspectionDrawer() {
           <section>
             <h4 className="text-[11px] mono uppercase tracking-widest text-muted-foreground mb-2">Detected Classes</h4>
             <div className="flex flex-wrap gap-2">
-              {(drain.detected.length ? drain.detected : ["none"]).map((d) => (
+              {(activeDrain.detected.length ? activeDrain.detected : ["none"]).map((d) => (
                 <span key={d} className="px-2.5 py-1 text-[11px] mono uppercase tracking-wider border border-border bg-card">
                   {d}
                 </span>
               ))}
               <span className="px-2.5 py-1 text-[11px] mono uppercase tracking-wider border border-border bg-card">
-                uptime · {drain.uptime}%
+                uptime · {activeDrain.uptime}%
               </span>
             </div>
           </section>
@@ -120,7 +142,7 @@ export function InspectionDrawer() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDispatching(true)}
-                disabled={drain.status === "dispatched"}
+                disabled={activeDrain.status === "dispatched"}
                 className="col-span-2 flex items-center justify-center gap-2 h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground transition-colors text-[12px] font-semibold uppercase tracking-widest disabled:opacity-40"
               >
                 <Send className="h-4 w-4" /> Quick Dispatch
