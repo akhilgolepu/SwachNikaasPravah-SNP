@@ -69,7 +69,7 @@ export function MapCanvas() {
   useEffect(() => setMounted(true), []);
 
   return (
-    <div className="relative w-full h-full bg-[#0A0A0A] overflow-hidden border border-border">
+    <div className="relative z-10 w-full h-full bg-[#0A0A0A] overflow-hidden border border-border">
       {mounted ? (
         <MapContainer
           center={INITIAL_CENTER}
