@@ -48,7 +48,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DrainageAI — ICCC Command Center" },
+      { title: "SwachNikaasPravah-SNP — ICCC Command Center" },
       { name: "description", content: "Real-time AI-powered drainage monitoring for Indian smart cities. Repurposing CCTV infrastructure to prevent urban flooding." },
     ],
     links: [

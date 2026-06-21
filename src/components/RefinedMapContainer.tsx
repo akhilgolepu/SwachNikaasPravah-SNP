@@ -1,7 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useSimStore } from '@/lib/simStore';
 
 export const RefinedMapContainer: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const focusedDrainId = useSimStore((s) => s.selectedDrainId);
+  const drains = useSimStore((s) => s.drains);
+  const focusedAsset = drains.find((d) => d.id === focusedDrainId);
   return (
     <motion.main
       initial={{ scale: 0.95, opacity: 0 }}
@@ -25,12 +29,21 @@ export const RefinedMapContainer: React.FC<{ children?: React.ReactNode }> = ({ 
 
       {/* Focused Asset Card */}
       <div className="relative z-20 p-8 h-full flex flex-col justify-end pointer-events-none">
-        <div className="glass-card p-6 w-fit animate-float pointer-events-auto shadow-2xl">
+        <div className={`glass-card p-6 w-fit transition-all duration-500 ${focusedAsset ? 'animate-float shadow-2xl pointer-events-auto' : 'opacity-40 blur-[1px]'}`}>
           <p className="text-xs font-mono text-[#00F2FF] mb-2 uppercase tracking-[0.1em]">
             Focused Asset
           </p>
-          <h3 className="text-xl font-bold mb-1 text-white">MUM-WOR-018</h3>
-          <p className="text-sm text-white/60">Worli, Mumbai · Blockage 84%</p>
+          {focusedAsset ? (
+            <>
+              <h3 className="text-xl font-bold mb-1 text-white">{focusedAsset.id}</h3>
+              <p className="text-sm text-white/60">{focusedAsset.ward}, {focusedAsset.city} · Blockage {focusedAsset.blockagePct}%</p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-medium mb-1 text-white/40 uppercase tracking-wider">Awaiting Selection</h3>
+              <p className="text-sm text-white/30">Select an alert or scan sector</p>
+            </>
+          )}
         </div>
       </div>
 
