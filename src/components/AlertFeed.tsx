@@ -32,7 +32,7 @@ export function AlertFeed() {
           return (
             <button
               key={d.id}
-              onClick={() => simStore.selectDrain(d.id)}
+              onClick={() => simStore.focusDrain(d.id)}
               className={`group w-full text-left px-5 py-4 border-b border-border transition-colors ${
                 isSel ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
               }`}
