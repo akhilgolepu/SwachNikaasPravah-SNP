@@ -6,11 +6,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AppNavbar } from "@/components/AppNavbar";
+import { RefinedHeader } from "@/components/RefinedHeader";
+import { StormModeOverlay } from "@/components/StormModeOverlay";
 import { Toaster } from "@/components/ui/sonner";
 import { startSimulator } from "@/lib/simStore";
 
@@ -75,12 +76,18 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [stormMode, setStormMode] = useState(false);
+
   useEffect(() => { startSimulator(); }, []);
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background text-foreground">
-        <AppNavbar />
-        <Outlet />
+      <div className="min-h-screen bg-background text-foreground overflow-x-hidden relative">
+        <StormModeOverlay active={stormMode} />
+        
+        <div className="relative z-10 mx-auto max-w-[1400px] px-4 sm:px-6 py-6 font-sans text-white">
+          <RefinedHeader stormMode={stormMode} setStormMode={setStormMode} />
+          <Outlet />
+        </div>
         <Toaster theme="dark" position="bottom-right" />
       </div>
     </QueryClientProvider>

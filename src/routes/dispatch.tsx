@@ -81,16 +81,16 @@ function DispatchPage() {
   };
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6">
+    <main className="space-y-8 relative z-10">
       <header className="mb-6">
-        <p className="text-[10px] mono uppercase tracking-widest text-muted-foreground">Operations / Dispatch</p>
-        <h1 className="text-2xl font-semibold mt-2">Dispatch & Ticket Control Center</h1>
+        <p className="text-[10px] mono uppercase tracking-widest text-[#00F2FF]">Operations / Dispatch</p>
+        <h1 className="text-3xl font-semibold mt-2 text-white glow-text">Dispatch & Ticket Control Center</h1>
       </header>
 
-      <section className="grid grid-cols-3 gap-px bg-border border border-border mb-6">
-        <StatTile label="Open" value={open.toString()} icon={<AlertTriangle className="h-4 w-4 text-risk-critical" />} />
-        <StatTile label="In Field" value={inField.toString()} icon={<Users className="h-4 w-4 text-risk-warning" />} />
-        <StatTile label="Resolved Today" value={resolved.toString()} icon={<CheckCircle2 className="h-4 w-4 text-risk-ok" />} />
+      <section className="grid grid-cols-3 gap-6 mb-6">
+        <StatTile label="Open" value={open.toString()} icon={<AlertTriangle className="h-6 w-6 text-[#FF3B3B]" />} />
+        <StatTile label="In Field" value={inField.toString()} icon={<Users className="h-6 w-6 text-[#F5A524]" />} />
+        <StatTile label="Resolved Today" value={resolved.toString()} icon={<CheckCircle2 className="h-6 w-6 text-[#17C964]" />} />
       </section>
 
       {escalationBanner && (
@@ -105,13 +105,13 @@ function DispatchPage() {
         </div>
       )}
 
-      <section className="grid grid-cols-12 gap-6">
+      <section className="grid grid-cols-12 gap-8">
         <div className="col-span-12 lg:col-span-5">
-          <div className="bento" style={{ padding: 0 }}>
-            <div className="px-5 py-4 border-b border-border">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wider">Active Tickets</h2>
+          <div className="glass-card overflow-hidden h-full flex flex-col" style={{ padding: 0 }}>
+            <div className="px-6 py-5 border-b border-white/10 bg-white/5">
+              <h2 className="text-[13px] font-semibold uppercase tracking-wider text-white">Active Tickets</h2>
             </div>
-            <div>
+            <div className="overflow-y-auto flex-1">
               {visibleTickets.map((t) => {
                 const isSel = selected?.id === t.id;
                 const isResolving = resolvingIds.includes(t.id);
@@ -122,42 +122,42 @@ function DispatchPage() {
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
                     style={{
-                      transition: "opacity 500ms ease, transform 500ms ease, max-height 500ms ease, padding 500ms ease",
+                      transition: "all 500ms cubic-bezier(0.4, 0, 0.2, 1)",
                       opacity: isPurging ? 0 : isResolving ? 0 : 1,
                       transform: isPurging ? "translateX(40px)" : isResolving ? "scaleY(0)" : "none",
                       maxHeight: isResolving ? "0px" : "150px",
-                      paddingTop: isResolving ? "0px" : "16px",
-                      paddingBottom: isResolving ? "0px" : "16px",
+                      paddingTop: isResolving ? "0px" : "20px",
+                      paddingBottom: isResolving ? "0px" : "20px",
                     }}
-                    className={`w-full text-left px-5 border-b border-border transition-all duration-500 ease-in-out transform origin-top overflow-hidden ${
+                    className={`w-full text-left px-6 border-b border-white/5 transition-all duration-500 ease-in-out transform origin-top overflow-hidden text-white ${
                       isResolving ? "py-0 border-b-transparent pointer-events-none" : ""
                     } ${
                       isEsc
                         ? isSel
-                          ? "bg-purple-950/40 border-l-4 border-l-purple-500"
-                          : "bg-purple-950/10 border-l-2 border-l-purple-700/50 hover:bg-purple-950/20"
+                          ? "bg-[#7000FF]/40 border-l-4 border-l-[#7000FF] shadow-[inset_10px_0_20px_rgba(112,0,255,0.2)]"
+                          : "bg-[#7000FF]/10 border-l-2 border-l-[#7000FF]/50 hover:bg-[#7000FF]/20"
                         : isSel
-                        ? "bg-primary/10 border-l-2 border-l-primary"
-                        : "hover:bg-surface-2"
+                        ? "bg-[#0066FF]/20 border-l-4 border-l-[#0066FF] shadow-[inset_10px_0_20px_rgba(0,102,255,0.2)]"
+                        : "hover:bg-white/5 border-l-4 border-l-transparent"
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="mono text-[12px] font-medium">{t.id}</span>
+                          <span className="mono text-[12px] font-medium opacity-80">{t.id}</span>
                           <StatusPill s={t.status} />
                         </div>
-                        <div className="text-[13px] font-medium mt-1">{t.drainName}</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                        <div className="text-[14px] font-semibold mt-1.5">{t.drainName}</div>
+                        <div className="text-[11px] text-white/50 mt-1">
                           {t.ward} · {t.createdAt}{t.crew ? ` · ${t.crew}` : ""}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`mono text-xl font-semibold ${
-                          isEsc ? "text-[#C4B5FD] font-bold" :
-                          t.riskIndex >= 70 ? "text-risk-critical" : t.riskIndex >= 45 ? "text-risk-warning" : "text-risk-ok"
+                        <div className={`mono text-2xl font-bold ${
+                          isEsc ? "text-[#C4B5FD] drop-shadow-[0_0_8px_rgba(196,181,253,0.8)]" :
+                          t.riskIndex >= 70 ? "text-[#FF3B3B] drop-shadow-[0_0_8px_rgba(255,59,59,0.8)]" : t.riskIndex >= 45 ? "text-[#F5A524]" : "text-[#17C964]"
                         }`}>{t.riskIndex}</div>
-                        <div className="text-[9px] mono uppercase tracking-widest text-muted-foreground">RI</div>
+                        <div className="text-[9px] mono uppercase tracking-widest text-white/40 mt-1">RI</div>
                       </div>
                     </div>
                   </button>
@@ -182,15 +182,15 @@ function DispatchPage() {
               )}
 
               {/* Evidence vault */}
-              <div className="bento" style={{ padding: 0 }}>
-                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <div className="glass-card overflow-hidden group" style={{ padding: 0 }}>
+                <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
                   <div>
-                    <h3 className="text-[13px] font-semibold uppercase tracking-wider flex items-center gap-2">
-                      <Camera className="h-3.5 w-3.5" /> Visual Evidence Vault
+                    <h3 className="text-[13px] font-semibold uppercase tracking-wider flex items-center gap-2 text-white">
+                      <Camera className="h-3.5 w-3.5 text-[#00F2FF]" /> Visual Evidence Vault
                     </h3>
-                    <p className="text-[11px] text-muted-foreground mono mt-1">Threshold breach frame · {selected.evidenceFrame}</p>
+                    <p className="text-[11px] text-white/50 mono mt-1">Threshold breach frame · {selected.evidenceFrame}</p>
                   </div>
-                  <span className="mono text-[11px] text-muted-foreground">{selected.drainId}</span>
+                  <span className="mono text-[11px] text-[#0066FF] font-bold bg-[#0066FF]/10 px-2 py-1 rounded-md">{selected.drainId}</span>
                 </div>
                 <div className="relative aspect-[16/8] bg-black overflow-hidden">
                   <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, #1a2030 0%, #0a0f18 60%, #0a0a0a 100%)" }} />
@@ -199,22 +199,27 @@ function DispatchPage() {
                   {[...Array(8)].map((_, i) => (
                     <div key={i} className="absolute h-2 w-3" style={{ left: `${15 + i * 9}%`, bottom: `${28 + (i % 3) * 4}%`, background: i % 2 ? "#a89656" : "#7a5a3a" }} />
                   ))}
-                  <div className={`absolute border-2 ${selected.status === "escalated" ? "border-purple-500" : "border-risk-critical"}`} style={{ left: "22%", top: "50%", width: "35%", height: "35%" }}>
-                    <span className={`absolute -top-5 left-0 text-[10px] mono px-1.5 text-white ${selected.status === "escalated" ? "bg-purple-600" : "bg-risk-critical"}`}>plastic 0.94</span>
+                  <div className={`absolute border-2 shadow-[0_0_20px_rgba(255,59,59,0.5)] ${selected.status === "escalated" ? "border-[#7000FF]" : "border-[#FF3B3B]"}`} style={{ left: "22%", top: "50%", width: "35%", height: "35%" }}>
+                    <span className={`absolute -top-5 left-0 text-[10px] mono px-2 py-0.5 text-white font-bold tracking-widest ${selected.status === "escalated" ? "bg-[#7000FF]" : "bg-[#FF3B3B]"}`}>plastic 0.94</span>
                   </div>
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/70 border border-border">
-                    <span className="text-[10px] mono uppercase tracking-widest text-white">REC · {selected.drainId}</span>
+                  <div className="absolute top-4 left-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10">
+                    <span className="text-[10px] mono uppercase tracking-widest text-white flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF3B3B] animate-pulse"></span> REC · {selected.drainId}
+                    </span>
                   </div>
-                  <div className="absolute bottom-3 right-3 px-2 py-1 bg-black/70 border border-border">
+                  <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded border border-white/10">
                     <span className="text-[10px] mono text-white">{selected.evidenceFrame}</span>
                   </div>
+                  
+                  {/* Scanner overlay effect on hover */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(0, 242, 255, 0.2) 1px, transparent 1px)', backgroundSize: '100% 4px' }} />
                 </div>
               </div>
 
-              <div className="bento" style={{ padding: 0 }}>
-                <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-                  <h3 className="text-[13px] font-semibold uppercase tracking-wider">Crew Assignment · Proximity Sort</h3>
-                  <span className="text-[10px] mono uppercase tracking-widest text-muted-foreground">
+              <div className="glass-card overflow-hidden" style={{ padding: 0 }}>
+                <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                  <h3 className="text-[13px] font-semibold uppercase tracking-wider text-white">Crew Assignment · Proximity Sort</h3>
+                  <span className="text-[10px] mono uppercase tracking-widest text-[#00F2FF]">
                     {selectedCrewId ? `Selected: ${crews.find((c) => c.id === selectedCrewId)?.name}` : "Auto: closest available"}
                   </span>
                 </div>
@@ -224,29 +229,33 @@ function DispatchPage() {
                     return (
                       <div
                         key={c.id}
-                        className={`px-5 py-4 border-b border-border flex items-center justify-between transition-colors ${
-                          c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? "cursor-pointer" : ""
+                        className={`px-6 py-5 border-b border-white/5 flex items-center justify-between transition-colors ${
+                          c.available && selected.status !== "resolved" && selected.status !== "false_positive" ? "cursor-pointer hover:bg-white/5" : ""
                         } ${
-                          isPicked ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-surface-2"
+                          isPicked ? "bg-[#0066FF]/10 border-l-4 border-l-[#0066FF]" : "border-l-4 border-l-transparent"
                         }`}
                         onClick={() => c.available && selected.status !== "resolved" && selected.status !== "false_positive" && setSelectedCrewId(isPicked ? null : c.id)}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className={`h-2 w-2 rounded-full ${c.available ? "bg-risk-ok pulse-dot" : "bg-risk-warning"}`} />
+                        <div className="flex items-center gap-4">
+                          <span className={`h-2.5 w-2.5 rounded-full ${c.available ? "bg-[#17C964] shadow-[0_0_8px_rgba(23,201,100,0.8)] animate-pulse" : "bg-[#F5A524]"}`} />
                           <div>
-                            <div className="text-[13px] font-medium">{c.name} · <span className="text-muted-foreground font-normal">{c.lead}</span></div>
-                            <div className="text-[11px] text-muted-foreground mono mt-0.5">{c.members} safai karamcharis · {c.available ? "available" : "engaged"}</div>
+                            <div className="text-[14px] font-semibold text-white">{c.name} · <span className="text-white/60 font-normal">{c.lead}</span></div>
+                            <div className="text-[11px] text-white/40 mono mt-1">{c.members} safai karamcharis · <span className={c.available ? "text-[#17C964]" : "text-[#F5A524]"}>{c.available ? "available" : "engaged"}</span></div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
                           <div className="text-right">
-                            <div className="mono text-sm font-medium">{c.distanceKm} km</div>
-                            <div className="text-[10px] mono text-muted-foreground">ETA ~{Math.round(c.distanceKm * 4)}m</div>
+                            <div className="mono text-lg font-bold text-white">{c.distanceKm} km</div>
+                            <div className="text-[10px] mono text-[#00F2FF]">ETA ~{Math.round(c.distanceKm * 4)}m</div>
                           </div>
                           <button
                             disabled={!c.available || selected.status === "resolved" || selected.status === "false_positive"}
                             onClick={(e) => { e.stopPropagation(); setSelectedCrewId(isPicked ? null : c.id); }}
-                            className="px-3 h-9 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[11px] font-semibold uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className={`px-4 h-10 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+                              isPicked 
+                                ? "bg-[#0066FF] text-white shadow-[0_0_15px_rgba(0,102,255,0.5)] border-transparent" 
+                                : "bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                            }`}
                           >
                             {isPicked ? "Selected" : "Assign"}
                           </button>
@@ -257,11 +266,11 @@ function DispatchPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 <button
                   onClick={handleDispatch}
                   disabled={selected.status === "in_progress" || selected.status === "resolved" || selected.status === "false_positive"}
-                  className="h-12 bg-foreground text-background hover:bg-primary hover:text-primary-foreground text-[12px] font-semibold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-14 rounded-xl bg-[#0066FF] text-white hover:bg-[#0052CC] text-[12px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(0,102,255,0.4)]"
                 >
                   Dispatch Crew <ArrowUpRight className="h-4 w-4" />
                 </button>
@@ -276,7 +285,7 @@ function DispatchPage() {
                         setResolvingIds((prev) => prev.filter((id) => id !== selected.id));
                       }, 500);
                     }}
-                    className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40"
+                    className="h-14 rounded-xl border-2 border-[#17C964] text-[#17C964] text-[12px] font-bold uppercase tracking-widest hover:bg-[#17C964] hover:text-black transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(23,201,100,0.2)]"
                   >
                     Resolve Ticket
                   </button>
@@ -284,7 +293,7 @@ function DispatchPage() {
                   <button
                     disabled={selected.status === "resolved" || selected.status === "false_positive"}
                     onClick={handleFalsePositive}
-                    className="h-12 border border-border text-[12px] font-medium uppercase tracking-widest hover:border-foreground hover:bg-surface-2 transition-colors disabled:opacity-40"
+                    className="h-14 rounded-xl border-2 border-white/10 text-white text-[12px] font-bold uppercase tracking-widest hover:border-white/30 hover:bg-white/5 transition-all disabled:opacity-30"
                   >
                     False Positive
                   </button>
@@ -292,7 +301,7 @@ function DispatchPage() {
                 <button
                   disabled={selected.status === "resolved" || selected.status === "false_positive" || selected.status === "escalated"}
                   onClick={handleEscalate}
-                  className="h-12 border border-risk-warning text-risk-warning text-[12px] font-medium uppercase tracking-widest hover:bg-risk-warning hover:text-black transition-colors disabled:opacity-40"
+                  className="h-14 rounded-xl border-2 border-[#F5A524] text-[#F5A524] text-[12px] font-bold uppercase tracking-widest hover:bg-[#F5A524] hover:text-black transition-all disabled:opacity-30 shadow-[0_0_15px_rgba(245,165,36,0.2)]"
                 >
                   Escalate · Sr. Engineer
                 </button>
@@ -307,25 +316,26 @@ function DispatchPage() {
 
 function StatTile({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="bg-card p-6 flex items-center justify-between">
-      <div>
-        <div className="text-[10px] mono uppercase tracking-widest text-muted-foreground">{label}</div>
-        <div className="mono text-3xl font-semibold mt-2">{value}</div>
+    <div className="glass-card p-6 flex items-center justify-between relative overflow-hidden group">
+      <div className="absolute inset-0 kinetic-gradient opacity-10 pointer-events-none transition-opacity group-hover:opacity-20" />
+      <div className="relative z-10">
+        <div className="text-[10px] mono uppercase tracking-widest text-white/40">{label}</div>
+        <div className="mono text-4xl font-bold mt-2 text-white">{value}</div>
       </div>
-      <div className="h-10 w-10 grid place-items-center border border-border">{icon}</div>
+      <div className="h-14 w-14 rounded-2xl grid place-items-center bg-white/5 border border-white/10 relative z-10 shadow-lg">{icon}</div>
     </div>
   );
 }
 
 function StatusPill({ s }: { s: string }) {
   const m: Record<string, { c: string; t: string }> = {
-    open: { c: "bg-risk-critical text-white", t: "OPEN" },
-    assigned: { c: "bg-risk-warning text-black", t: "ASSIGNED" },
-    in_progress: { c: "bg-primary text-white", t: "IN FIELD" },
-    resolved: { c: "bg-risk-ok text-black", t: "RESOLVED" },
-    false_positive: { c: "bg-muted text-muted-foreground", t: "FALSE POSITIVE" },
-    escalated: { c: "bg-purple-600 text-white border border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)] animate-pulse", t: "ESCALATED TO WARD ENGINEER" },
+    open: { c: "bg-[#FF3B3B]/20 text-[#FF3B3B] border border-[#FF3B3B]/30", t: "OPEN" },
+    assigned: { c: "bg-[#F5A524]/20 text-[#F5A524] border border-[#F5A524]/30", t: "ASSIGNED" },
+    in_progress: { c: "bg-[#0066FF]/20 text-[#0066FF] border border-[#0066FF]/30", t: "IN FIELD" },
+    resolved: { c: "bg-[#17C964]/20 text-[#17C964] border border-[#17C964]/30", t: "RESOLVED" },
+    false_positive: { c: "bg-white/10 text-white/40 border border-white/10", t: "FALSE POSITIVE" },
+    escalated: { c: "bg-[#7000FF]/30 text-[#D8B4FE] border border-[#7000FF]/50 shadow-[0_0_15px_rgba(112,0,255,0.4)] animate-pulse", t: "ESCALATED TO WARD ENGINEER" },
   };
   const v = m[s] ?? m.open;
-  return <span className={`text-[9px] mono uppercase tracking-widest px-1.5 py-0.5 ${v.c}`}>{v.t}</span>;
+  return <span className={`text-[9px] mono uppercase tracking-widest px-2 py-0.5 rounded-full ${v.c}`}>{v.t}</span>;
 }
